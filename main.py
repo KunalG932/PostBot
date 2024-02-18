@@ -3,10 +3,11 @@ import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
+from aiogram.client.default import DefaultBotProperties  # Add this import
 from pymongo import MongoClient
 
 # Set your Telegram bot token here
-API_TOKEN = '6753603405:AAEXkgfWXPiBr_TGynYIpyCEwEeDg-Ax_Ec'
+API_TOKEN = 'YOUR_BOT_TOKEN'
 
 # Channel ID where the bot will send a message on startup
 CHANNEL_ID = -1001824676870
@@ -21,14 +22,14 @@ mongo_client = MongoClient(MONGO_URI)
 db = mongo_client[MONGO_DB]
 user_collection = db[MONGO_COLLECTION]
 
-# Initialize Bot instance with a default parse mode which will be passed to all API calls
-bot = Bot(token=API_TOKEN, parse_mode=ParseMode.HTML)
+# Initialize Bot instance with default properties
+bot = Bot(token=API_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
 # Initialize Dispatcher with the Bot instance
-dp = Dispatcher()
+dp = Dispatcher(bot)
 
 # Command to show stats
-@dp.message_handler(commands=['stats'])
+@dp.message_handler(Command('stats'))
 async def show_stats(message: types.Message):
     total_users = user_collection.count_documents({})
     await message.reply(f"Total users: {total_users}")
@@ -49,7 +50,7 @@ async def on_startup(dp):
 # Updated main function
 async def main() -> None:
     # And the run events dispatching
-    dp.start_polling(bot, on_startup=on_startup, skip_updates=True)
+    dp.run_polling(on_startup=on_startup, skip_updates=True)
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
