@@ -2,7 +2,7 @@ import logging
 import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
-from aiogram.dispatcher.filters import Command
+from aiogram.filters import Command
 from pymongo import MongoClient
 
 # Set your Telegram bot token here
