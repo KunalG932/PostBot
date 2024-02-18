@@ -50,7 +50,7 @@ async def on_startup(dp):
 # Updated main function
 async def main() -> None:
     # And the run events dispatching
-    dp.start_polling(dp, on_startup=on_startup, skip_updates=True)
+    dp.start_polling(bot, on_startup=on_startup, skip_updates=True)
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
