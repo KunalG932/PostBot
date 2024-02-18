@@ -2,6 +2,7 @@ import logging
 import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
+from aiogram.dispatcher.filters import Command
 from pymongo import MongoClient
 
 # Set your Telegram bot token here
@@ -24,7 +25,7 @@ user_collection = db[MONGO_COLLECTION]
 dp = Dispatcher()
 
 # Command to show stats
-@dp.message(commands=['stats'])
+@dp.message(Command('stats'))
 async def show_stats(message: types.Message):
     total_users = user_collection.count_documents({})
     await message.reply(f"Total users: {total_users}")
