@@ -23,8 +23,9 @@ db = mongo_client[MONGO_DB]
 user_collection = db[MONGO_COLLECTION]
 
 # Initialize Bot instance with a default parse mode which will be passed to all API calls
-bot = Bot(token=API_TOKEN, parse_mode=ParseMode.HTML, default=types.DefaultBotProperties())
-# Initialize Dispatcher globally
+bot = Bot(token=API_TOKEN, parse_mode=ParseMode.HTML)
+
+# Initialize Dispatcher with the Bot instance
 dp = Dispatcher(bot)
 
 # Command to show stats
@@ -46,6 +47,11 @@ async def handle_text(message: types.Message):
 async def on_startup(dp):
     await bot.send_message(chat_id=CHANNEL_ID, text="Bot is now alive!")
 
+# Updated main function
+async def main() -> None:
+    # And the run events dispatching
+    await dp.start_polling(skip_updates=True)
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    executor.start_polling(dp, on_startup=on_startup, skip_updates=True)
+    asyncio.run(main())
