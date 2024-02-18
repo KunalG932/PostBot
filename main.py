@@ -21,17 +21,19 @@ mongo_client = MongoClient(MONGO_URI)
 db = mongo_client[MONGO_DB]
 user_collection = db[MONGO_COLLECTION]
 
+# Initialize Bot instance with a default parse mode which will be passed to all API calls
+bot = Bot(API_TOKEN, parse_mode=ParseMode.HTML)
 # Initialize Dispatcher globally
-dp = Dispatcher()
+dp = Dispatcher(bot)
 
 # Command to show stats
-@dp.message(Command('stats'))
+@dp.message_handler(commands=['stats'])
 async def show_stats(message: types.Message):
     total_users = user_collection.count_documents({})
     await message.reply(f"Total users: {total_users}")
 
 # Message handler for any text message
-@dp.message(content_types=types.ContentType.TEXT)
+@dp.message_handler()
 async def handle_text(message: types.Message):
     user_id = message.from_user.id
     user_collection.update_one({'_id': user_id}, {'$setOnInsert': {'_id': user_id}}, upsert=True)
@@ -44,10 +46,8 @@ async def on_startup(dp):
     await bot.send_message(chat_id=CHANNEL_ID, text="Bot is now alive!")
 
 async def main() -> None:
-    # Initialize Bot instance with a default parse mode which will be passed to all API calls
-    bot = Bot(API_TOKEN, parse_mode=ParseMode.HTML)
     # And the run events dispatching
-    await dp.start_polling(bot, skip_updates=True)
+    await dp.start_polling(skip_updates=True)
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
