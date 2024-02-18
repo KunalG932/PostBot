@@ -4,6 +4,7 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from pymongo import MongoClient
+from aiogram.utils import executor
 
 # Set your Telegram bot token here
 API_TOKEN = '6753603405:AAEXkgfWXPiBr_TGynYIpyCEwEeDg-Ax_Ec'
@@ -22,7 +23,7 @@ db = mongo_client[MONGO_DB]
 user_collection = db[MONGO_COLLECTION]
 
 # Initialize Bot instance with a default parse mode which will be passed to all API calls
-bot = Bot(API_TOKEN, parse_mode=ParseMode.HTML)
+bot = Bot(token=API_TOKEN, parse_mode=ParseMode.HTML, default=types.DefaultBotProperties())
 # Initialize Dispatcher globally
 dp = Dispatcher(bot)
 
@@ -45,10 +46,6 @@ async def handle_text(message: types.Message):
 async def on_startup(dp):
     await bot.send_message(chat_id=CHANNEL_ID, text="Bot is now alive!")
 
-async def main() -> None:
-    # And the run events dispatching
-    await dp.start_polling(skip_updates=True)
-
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    asyncio.run(main())
+    executor.start_polling(dp, on_startup=on_startup, skip_updates=True)
