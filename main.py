@@ -4,6 +4,7 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from pymongo import MongoClient
+from aiogram.utils import executor
 
 # Set your Telegram bot token here
 API_TOKEN = '6753603405:AAEXkgfWXPiBr_TGynYIpyCEwEeDg-Ax_Ec'
@@ -24,8 +25,11 @@ user_collection = db[MONGO_COLLECTION]
 # Initialize Bot instance with a default parse mode which will be passed to all API calls
 bot = Bot(token=API_TOKEN, parse_mode=ParseMode.HTML)
 
-# Initialize Dispatcher with the Bot instance
-dp = Dispatcher(bot)
+# Initialize Dispatcher without passing the Bot instance
+dp = Dispatcher()
+
+# Associate the Bot instance with the Dispatcher
+dp.init_bot(bot)
 
 # Command to show stats
 @dp.message_handler(commands=['stats'])
