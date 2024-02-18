@@ -7,7 +7,7 @@ from aiogram.client.default import DefaultBotProperties  # Add this import
 from pymongo import MongoClient
 
 # Set your Telegram bot token here
-API_TOKEN = 'YOUR_BOT_TOKEN'
+API_TOKEN = '6753603405:AAEXkgfWXPiBr_TGynYIpyCEwEeDg-Ax_Ec'
 
 # Channel ID where the bot will send a message on startup
 CHANNEL_ID = -1001824676870
