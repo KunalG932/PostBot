@@ -26,7 +26,7 @@ user_collection = db[MONGO_COLLECTION]
 bot = Bot(token=API_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
 # Initialize Dispatcher with the Bot instance
-dp = Dispatcher()
+dp = Dispatcher(bot)
 
 # Command to show stats
 @dp.message_handler(Command('stats'))
@@ -50,7 +50,7 @@ async def on_startup(dp):
 # Updated main function
 async def main() -> None:
     # And the run events dispatching
-    dp.run_polling(bot, on_startup=on_startup, skip_updates=True)
+    dp.run_polling(on_startup=on_startup, skip_updates=True)
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
