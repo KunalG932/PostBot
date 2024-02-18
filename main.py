@@ -1,7 +1,8 @@
 import logging
+import asyncio
+import sys  # Add this line to import sys
 from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
-from aiogram import executor
 from pymongo import MongoClient
 
 # Set your Telegram bot token here
@@ -49,9 +50,13 @@ async def handle_text(message: types.Message):
 async def on_startup(dp):
     await bot.send_message(chat_id=CHANNEL_ID, text="Bot is now alive!")
 
-# Set the on_startup event handler
-if __name__ == '__main__':
-    from aiogram import executor
 
+# Set the on_startup event handler
+async def main() -> None:
+    await dp.start_polling(bot, skip_updates=True)
+
+
+if __name__ == "__main__":
     dp.register_on_startup(on_startup)
-    executor.start_polling(dp, skip_updates=True)
+    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+    asyncio.run(main())
