@@ -26,7 +26,7 @@ user_collection = db[MONGO_COLLECTION]
 bot = Bot(token=API_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
 # Initialize Dispatcher with the Bot instance
-dp = Dispatcher(bot)
+dp = Dispatcher()
 
 # Command to show stats
 @dp.message_handler(Command('stats'))
