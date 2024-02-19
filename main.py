@@ -44,7 +44,7 @@ async def cmd_start(message: types.Message):
         upsert=True
     )
 
-@router.message(lambda message: message.text.lower() == "🌟 create post 🌟")
+@router.message(lambda message: message.text?.lower() == "🌟 create post 🌟")
 async def cmd_create_post(message: types.Message):
     # Create a new keyboard with options: Text, Media, Back
     keyboard = ReplyKeyboardMarkup(
