@@ -27,7 +27,7 @@ async def main() -> None:
     await dp.start_polling(bot)
 
     # Send a message to the specified channel indicating that the bot is now alive
-    await bot.send_message(chat_id=CHANNEL_ID, text="Bot is now alive!")
+    await bot.send_message(chat_id=CHANNEL_ID, text="Bot is now alive!", parse_mode=ParseMode.HTML)
 
 
 if __name__ == "__main__":
