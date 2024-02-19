@@ -1,34 +1,65 @@
 import asyncio
 import logging
+from aiogram import Bot, Dispatcher, types, Router
+from aiogram.types import Message, Chat
 
-from handlers.start import start_router
+from pymongo import MongoClient
 
-from aiogram import Bot, Dispatcher
-from aiogram.enums import ParseMode
-from aiogram.client.default import DefaultBotProperties  # Add this import
+# MongoDB configuration
+MONGO_URI = "mongodb+srv://exp69:exp69@cluster0.kr93qbe.mongodb.net/?retryWrites=true&w=majority"
+DATABASE_NAME = "Postbot"
+USER_COLLECTION_NAME = "users"
+GROUP_COLLECTION_NAME = "groups"
 
 # Bot token can be obtained via https://t.me/BotFather
-TOKEN = "6753603405:AAEXkgfWXPiBr_TGynYIpyCEwEeDg-Ax_Ec"
+TOKEN = "YOUR_BOT_TOKEN"
 CHANNEL_ID = -1001824676870
 
-async def main() -> None:
-    # Dispatcher is a root router
-    dp = Dispatcher()
-    # Register all the routers from handlers package
-    dp.include_routers(
-        start_router,
-    )
+# Initialize MongoDB client and databases
+mongo_client = MongoClient(MONGO_URI)
+db = mongo_client[DATABASE_NAME]
+user_collection = db[USER_COLLECTION_NAME]
+group_collection = db[GROUP_COLLECTION_NAME]
 
-    # Initialize Bot instance with a default parse mode using DefaultBotProperties
-    bot = Bot(TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-    
-    # Start polling
-    await dp.start_polling(bot)
+# Router for handling start command
+start_router = Router()
 
-    # Send a message to the specified channel indicating that the bot is now alive
-    await bot.send_message(chat_id=CHANNEL_ID, text="Bot is now alive!", parse_mode=ParseMode.HTML)
+
+@start_router.message(types.ChatType.PRIVATE, Command("start"))
+async def command_start_handler(message: Message) -> None:
+    """
+    This handler receives messages with `/start` command in private chat
+    """
+    user_id = message.from_user.id
+    user_collection.update_one({"_id": user_id}, {"$set": {"username": message.from_user.username}}, upsert=True)
+    await message.answer(f"Hello, <b>{message.from_user.full_name}!</b>")
+
+
+@start_router.chat_member(Command("start"))
+async def command_start_group_handler(message: Message, chat_member: Chat):
+    """
+    This handler receives messages with `/start` command in a group or channel
+    """
+    chat_id = message.chat.id
+    group_collection.update_one({"_id": chat_id}, {"$set": {"title": chat_member.title}}, upsert=True)
+    await message.reply(f"Hello, {chat_member.title} group member!")
+
+
+async def stats_command_handler(message: Message):
+    """
+    This handler receives messages with `/stats` command
+    """
+    total_users = user_collection.count_documents({})
+    total_groups = group_collection.count_documents({})
+    await message.answer(f"Total users: {total_users}\nTotal groups: {total_groups}")
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    asyncio.run(main())
+
+    dp = Dispatcher()
+    dp.include_router(start_router)
+    dp.register_message_handler(stats_command_handler, commands="stats")
+
+    bot = Bot(TOKEN)
+    dp.run_polling(bot)
