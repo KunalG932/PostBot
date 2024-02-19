@@ -28,7 +28,7 @@ async def cmd_start(event: types.Message):
     
     # Your existing start command logic here...
 
-@start_router.message(Command("stats"))
+@stats_router.message(Command("stats"))
 async def cmd_stats(event: types.Message):
     # Count total users
     total_users = await db.users.count_documents({})
