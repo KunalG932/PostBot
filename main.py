@@ -25,7 +25,9 @@ app = Router()
 @app.message(Command("start"))
 async def cmd_start(message: types.Message):
     # Create a custom keyboard with a "Create Post" button
-    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, keyboard=[[types.KeyboardButton("Create Post")]])
+    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    create_post_button = types.KeyboardButton("Create Post")
+    keyboard.add(create_post_button)
 
     # Send the welcome message with the custom keyboard
     await message.answer(
