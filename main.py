@@ -8,8 +8,6 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.enums import ParseMode
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
 from aiogram.client.default import DefaultBotProperties
 from constants import *
 
@@ -75,17 +73,15 @@ async def cmd_back(message: types.Message):
 
     await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
 
-class PostState(StatesGroup):
-    SAVING_MESSAGE = State()
-    ADDING_BUTTONS = State()
-
 @router.message(lambda message: message.text == "Text")
-async def handle_text_option(message: types.Message, state: FSMContext):
-    # Set the state to SAVING_MESSAGE to save the user's message
-    await PostState.SAVING_MESSAGE.set()
+async def cmd_text_post(message: types.Message):
+    # Ask the user to provide the text for the post
+    await message.answer("Please provide the text for your text post:")
 
-    # Save the user's message in the state
-    await state.update_data(saved_message=message.text)
+@router.message(lambda message: message.text)
+async def process_text_post(message: types.Message):
+    # Save the text provided by the user
+    text_content = message.text
 
     # Ask if the user wants to add buttons
     keyboard = ReplyKeyboardMarkup(
@@ -94,51 +90,30 @@ async def handle_text_option(message: types.Message, state: FSMContext):
         ],
         resize_keyboard=True,
     )
-    await message.answer("Do you want to add buttons to your message?", reply_markup=keyboard)
 
-@router.message((lambda message: message.text == "Yes"), state=PostState.SAVING_MESSAGE)
-async def handle_add_buttons(message: types.Message, state: FSMContext):
-    # Set the state to ADDING_BUTTONS to handle the button addition
-    await PostState.ADDING_BUTTONS.set()
+    await message.answer("Do you want to add buttons to your text post?", reply_markup=keyboard)
 
-    # Ask the user for the button format
-    await message.answer("Provide the button format (e.g., Translator + [https://t.me/TransioBot], text + url):")
+@router.message(lambda message: message.text.lower() in {"yes", "no"})
+async def process_buttons_choice(message: types.Message):
+    choice = message.text.lower()
 
-@router.message(state=PostState.ADDING_BUTTONS)
-async def handle_button_format(message: types.Message, state: FSMContext):
-    # Get the saved message from the state
-    data = await state.get_data()
-    saved_message = data.get("saved_message")
-
-    # Process the button format and create the reply message
-    button_format = message.text
-    post_message = f"{saved_message}\n\n{button_format}"
-
-    # Create the InlineKeyboardButton based on the provided format
-    button_parts = button_format.split("+")
-    if len(button_parts) == 2:
-        button_text, button_url = button_parts[0].strip(), button_parts[1].strip()
-        post_keyboard = InlineKeyboardMarkup().insert(InlineKeyboardButton(text=button_text, url=button_url))
+    if choice == "yes":
+        # Ask for the button format
+        await message.answer("Provide the button format (e.g., Button Text + [URL]):")
     else:
-        post_keyboard = None  # Handle the case where the format is incorrect
+        # Skip adding buttons and provide the final post
+        await message.answer("This is the content of my text post.")
+        if choice == "no":
+            await message.answer("No buttons added.")
+        else:
+            await message.answer("Invalid choice. No buttons added.")
 
-    # Reply with the saved message and the button
-    await message.reply(post_message, reply_markup=post_keyboard)
+@router.message(lambda message: "+" in message.text and "[" in message.text and "]" in message.text)
+async def process_button_format(message: types.Message):
+    button_format = message.text
 
-    # Reset the state to the initial state
-    await state.finish()
-
-@router.message((lambda message: message.text == "No"), state=PostState.SAVING_MESSAGE)
-async def handle_no_buttons(message: types.Message, state: FSMContext):
-    # Get the saved message from the state
-    data = await state.get_data()
-    saved_message = data.get("saved_message")
-
-    # Reply with the saved message without buttons
-    await message.reply(saved_message)
-
-    # Reset the state to the initial state
-    await state.finish()
+    # Parse the button format and provide the final post
+    await message.answer("This is the content of my text post.\n\n" + button_format)
 
 @router.message(Command("stats"))
 async def cmd_stats(message: types.Message):
