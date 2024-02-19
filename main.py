@@ -48,8 +48,8 @@ async def new_chat_members(event: types.Message):
         if member.user.id == event.bot.id:
             # Insert channel ID into the database
             await db.channels.update_one(
-                {"channel_id": event.chat.id},
-                {"$set": {"channel_id": event.chat.id}},
+                {"channel_id": event.chat_id},  # Fix here: use event.chat_id instead of event.chat.id
+                {"$set": {"channel_id": event.chat_id}},
                 upsert=True
             )
 
