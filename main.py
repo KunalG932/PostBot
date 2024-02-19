@@ -40,7 +40,7 @@ async def cmd_stats(message: types.Message):
     # Send the stats message
     await message.reply(f"Total users: {total_users}\nTotal channels/groups: {total_channels}")
 
-@app.message(content_types=types.ContentTypes.NEW_CHAT_MEMBERS)
+@app.message(content_types=types.ContentType.NEW_CHAT_MEMBERS)
 async def handle_new_chat_members(message: types.Message):
     for member in message.new_chat_members:
         if member.id == bot.id:
