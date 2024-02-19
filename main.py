@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import motor.motor_asyncio
+from aiogram import Router
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types.chat_member_updated import ChatMemberUpdated
@@ -12,8 +13,8 @@ MONGO_URI = "mongodb+srv://exp69:exp69@cluster0.kr93qbe.mongodb.net/?retryWrites
 mongo_client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
 db = mongo_client["Postbot"]  # Replace with your desired database name
 
-start_router = Dispatcher()
-stats_router = Dispatcher()
+start_router = Router()
+stats_router = Router()
 
 
 @start_router.message(Command("start"))
@@ -56,8 +57,10 @@ async def main() -> None:
     logging.basicConfig(level=logging.INFO)
 
     dp = Dispatcher()
-    dp.register_router(start_router)
-    dp.register_router(stats_router)
+    dp.include_routers(
+        start_router,
+        stats_router,
+    )
 
     bot = Bot(TOKEN)
 
