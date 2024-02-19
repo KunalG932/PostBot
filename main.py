@@ -73,6 +73,53 @@ async def cmd_back(message: types.Message):
 
     await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
 
+@router.message(lambda message: message.text == "Text")
+async def cmd_text_option(message: types.Message):
+    # Ask the user to provide a text message for the post
+    await message.answer("Please provide your text message for the post.")
+
+@router.message()
+async def process_text_message(message: types.Message):
+    # Save the user's text as a post
+    post_text = message.reply_to_message.text if message.reply_to_message else message.text
+
+    # Process the post_text as needed (for example, extract buttons)
+    # For simplicity, let's assume the user provides buttons in the specified format
+
+    # Check if the user provided buttons in the specified format
+    if "[button" in post_text.lower():
+        # Process buttons and extract them
+        buttons = process_buttons(post_text)
+
+        # Do something with the extracted buttons (e.g., send them to the channel)
+        await send_buttons_to_channel(message, buttons)
+
+        # Reply to the user that the post is ready to send to the channel
+        await message.answer("Your post is ready to send to the channel!")
+    else:
+        # If no buttons provided, save the post without buttons
+        await db.posts.insert_one({"user_id": message.from_user.id, "text": post_text})
+
+        # Reply to the user that the post is ready to send to the channel
+        await message.answer("Your post is ready to send to the channel!")
+
+# Function to process buttons in the specified format
+def process_buttons(post_text):
+    # Extract buttons from the post_text
+    # Implement your logic to process buttons in the specified format
+    # For simplicity, let's assume the buttons are provided in the correct format
+    buttons = [button.strip() for button in post_text.split("[") if button]
+
+    return buttons
+
+# Function to send buttons to the channel
+async def send_buttons_to_channel(message, buttons):
+    # Implement your logic to send buttons to the channel
+    # For simplicity, let's assume you have a channel_id variable
+    channel_id = CHANNEL_ID
+    buttons_text = " ".join(buttons)
+    await message.bot.send_message(channel_id, buttons_text)
+
 @router.message(Command("stats"))
 async def cmd_stats(message: types.Message):
     total_users = await db.users.count_documents({})
