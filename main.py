@@ -8,6 +8,8 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.enums import ParseMode
+from aiogram.dispatcher import FSMContext
+from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.client.default import DefaultBotProperties
 from constants import *
 
@@ -73,69 +75,70 @@ async def cmd_back(message: types.Message):
 
     await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
 
-@router.message(lambda message: message.text == "Text")
-async def cmd_text_option(message: types.Message):
-    # Ask the user to provide a text message for the post
-    await message.answer("Please provide your text message for the post.")
+class PostState(StatesGroup):
+    SAVING_MESSAGE = State()
+    ADDING_BUTTONS = State()
 
-@router.message(lambda message: message.text.lower() == "yes")
-async def cmd_yes_add_buttons(message: types.Message):
-    # Provide instructions for adding buttons
-    await message.answer(
-        "To add buttons, use the following format:\n"
-        "[Button text + Button URL]\n"
-        "For example:\n"
-        "[Translator + https://t.me/TransioBot]\n"
-        "[Text + https://example.com]"
+@router.message(Text(equals="Text"))
+async def handle_text_option(message: types.Message, state: FSMContext):
+    # Set the state to SAVING_MESSAGE to save the user's message
+    await PostState.SAVING_MESSAGE.set()
+
+    # Save the user's message in the state
+    await state.update_data(saved_message=message.text)
+
+    # Ask if the user wants to add buttons
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="Yes"), KeyboardButton(text="No")]
+        ],
+        resize_keyboard=True,
     )
+    await message.answer("Do you want to add buttons to your message?", reply_markup=keyboard)
 
-@router.message(lambda message: message.text.lower() == "no")
-async def cmd_no_add_buttons(message: types.Message):
-    # Reply to the user that the post is ready to send to the channel
-    await message.answer("Your post is ready to send to the channel!")
+@router.message(Text(equals="Yes"), state=PostState.SAVING_MESSAGE)
+async def handle_add_buttons(message: types.Message, state: FSMContext):
+    # Set the state to ADDING_BUTTONS to handle the button addition
+    await PostState.ADDING_BUTTONS.set()
 
-@router.message()
-async def process_text_message(message: types.Message):
-    # Save the user's text as a post
-    post_text = message.reply_to_message.text if message.reply_to_message else message.text
+    # Ask the user for the button format
+    await message.answer("Provide the button format (e.g., Translator + [https://t.me/TransioBot], text + url):")
 
-    # Check if the post_text contains buttons in the specified format
-    if "[button" in post_text.lower():
-        # Process buttons and extract them
-        buttons = process_buttons(post_text)
+@router.message(state=PostState.ADDING_BUTTONS)
+async def handle_button_format(message: types.Message, state: FSMContext):
+    # Get the saved message from the state
+    data = await state.get_data()
+    saved_message = data.get("saved_message")
 
-        # Send the post with buttons to the channel
-        await send_post_with_buttons(message, post_text, buttons)
+    # Process the button format and create the reply message
+    button_format = message.text
+    post_message = f"{saved_message}\n\n{button_format}"
 
-        # Reply to the user that the post with buttons is ready
-        await message.answer("Your post with buttons is ready to send to the channel!")
+    # Create the InlineKeyboardButton based on the provided format
+    button_parts = button_format.split("+")
+    if len(button_parts) == 2:
+        button_text, button_url = button_parts[0].strip(), button_parts[1].strip()
+        post_keyboard = InlineKeyboardMarkup().insert(InlineKeyboardButton(text=button_text, url=button_url))
     else:
-        # If no buttons provided, save the post without buttons
-        await db.posts.insert_one({"user_id": message.from_user.id, "text": post_text})
+        post_keyboard = None  # Handle the case where the format is incorrect
 
-        # Reply to the user that the post without buttons is ready
-        await message.answer("Your post without buttons is ready to send to the channel!")
+    # Reply with the saved message and the button
+    await message.reply(post_message, reply_markup=post_keyboard)
 
-# Function to process buttons in the specified format
-def process_buttons(post_text):
-    # Extract buttons from the post_text
-    # Implement your logic to process buttons in the specified format
-    # For simplicity, let's assume the buttons are provided in the correct format
-    buttons = [button.strip() for button in post_text.split("[") if button]
+    # Reset the state to the initial state
+    await state.finish()
 
-    return buttons
+@router.message(Text(equals="No"), state=PostState.SAVING_MESSAGE)
+async def handle_no_buttons(message: types.Message, state: FSMContext):
+    # Get the saved message from the state
+    data = await state.get_data()
+    saved_message = data.get("saved_message")
 
-# Function to send the post with buttons to the channel
-async def send_post_with_buttons(message, post_text, buttons):
-    # Implement your logic to send the post with buttons to the channel
-    # For simplicity, let's assume you have a channel_id variable
-    channel_id = CHANNEL_ID
+    # Reply with the saved message without buttons
+    await message.reply(saved_message)
 
-    # Join the buttons and add them to the post_text
-    post_with_buttons = f"{post_text}\n\n{' '.join(buttons)}"
-
-    # Send the complete post with buttons to the channel
-    await message.bot.send_message(channel_id, post_with_buttons)
+    # Reset the state to the initial state
+    await state.finish()
 
 @router.message(Command("stats"))
 async def cmd_stats(message: types.Message):
