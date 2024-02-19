@@ -2,7 +2,7 @@ import asyncio
 import logging
 from os import getenv
 
-from resource.start import start_router
+from handlers.start import start_router
 
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
