@@ -19,7 +19,7 @@ start_router = Router()
 stats_router = Router()
 
 
-@start_router.message(commands=["start"])
+@start_router.message(Command("start"))
 async def cmd_start(message: types.Message):
     # Insert user ID into the database
     await message.answer(f"Hello, <b>{message.from_user.full_name}!</b>")
@@ -43,7 +43,7 @@ async def new_chat_members(message: types.Message):
         )
 
 
-@stats_router.message(commands=["stats"])
+@stats_router.message(Command("stats"))
 async def cmd_stats(message: types.Message):
     # Count total users
     total_users = await db.users.count_documents({})
