@@ -31,7 +31,7 @@ async def cmd_start(message: types.Message):
 
     # Send the welcome message with the custom keyboard
     await message.answer(
-        f"Hello, <b>{message.from_user.full_name} !</b>\n"
+        f"Hello, <b>{message.from_user.full_name}!</b>\n"
         "You can use the following options:",
         reply_markup=keyboard,
         parse_mode=ParseMode.HTML
@@ -43,6 +43,46 @@ async def cmd_start(message: types.Message):
         {"$set": {"user_id": message.from_user.id}},
         upsert=True
     )
+
+@router.message(lambda message: message.text.lower() == "🌟 create post 🌟")
+async def cmd_create_post(message: types.Message):
+    # Create a new keyboard with options: Text, Media, Back
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="Text"), KeyboardButton(text="Media")],
+            [KeyboardButton(text="Back")]
+        ],
+        resize_keyboard=True,
+    )
+
+    # Send the options for creating a post
+    await message.answer(
+        "Choose an option to create a post:",
+        reply_markup=keyboard,
+    )
+
+@router.message(lambda message: message.text.lower() in ["text", "media"])
+async def process_post_option(message: types.Message):
+    # Handle the chosen post option (Text or Media)
+    option = message.text.lower()
+    
+    # Your logic to handle the chosen option goes here
+    await message.answer(f"You selected: {option}")
+
+@router.message(lambda message: message.text.lower() == "back")
+async def cmd_back(message: types.Message):
+    # Send a message acknowledging the "Back" button click
+    await message.answer("You returned to the previous menu.")
+
+    # Re-send the original keyboard after returning
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🌟 Create Post 🌟")]
+        ],
+        resize_keyboard=True,
+    )
+    
+    await message.answer("You can use the following options:", reply_markup=keyboard)
 
 @router.message(Command("stats"))
 async def cmd_stats(message: types.Message):
