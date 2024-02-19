@@ -1,67 +1,69 @@
 import asyncio
 import logging
-from aiogram import Bot, Dispatcher, types, Router
-from aiogram.types import Message, Chat
-from aiogram.enums.chat_type import ChatType
-from aiogram.filters import Command
+from motor.motor_asyncio import AsyncIOMotorClient  # Import Motor library for MongoDB
 
-from pymongo import MongoClient
+from aiogram import Bot, Dispatcher, types
+from aiogram.types import ParseMode
+from aiogram.contrib.middlewares.logging import LoggingMiddleware
 
-# MongoDB configuration
-MONGO_URI = "mongodb+srv://exp69:exp69@cluster0.kr93qbe.mongodb.net/?retryWrites=true&w=majority"
-DATABASE_NAME = "Postbot"
-USER_COLLECTION_NAME = "users"
-GROUP_COLLECTION_NAME = "groups"
+from aiogram.dispatcher import DefaultRouter, filters
 
 # Bot token can be obtained via https://t.me/BotFather
-TOKEN = "YOUR_BOT_TOKEN"
+TOKEN = "6753603405:AAEXkgfWXPiBr_TGynYIpyCEwEeDg-Ax_Ec"
 CHANNEL_ID = -1001824676870
 
-# Initialize MongoDB client and databases
-mongo_client = MongoClient(MONGO_URI)
-db = mongo_client[DATABASE_NAME]
-user_collection = db[USER_COLLECTION_NAME]
-group_collection = db[GROUP_COLLECTION_NAME]
+# MongoDB connection parameters
+MONGO_URI = "mongodb+srv://exp69:exp69@cluster0.kr93qbe.mongodb.net/?retryWrites=true&w=majority"
+DB_NAME = "Postbot"
 
-# Router for handling start command
-start_router = Router()
+# Initialize MongoDB client
+mongo_client = AsyncIOMotorClient(MONGO_URI)
+mongo_db = mongo_client[DB_NAME]
 
+# Define a collection for storing user data
+users_collection = mongo_db["users"]
 
-@start_router.message(ChatType.PRIVATE, Command("start"))
-async def command_start_handler(message: Message) -> None:
-    """
-    This handler receives messages with `/start` command in private chat
-    """
-    user_id = message.from_user.id
-    user_collection.update_one({"_id": user_id}, {"$set": {"username": message.from_user.username}}, upsert=True)
-    await message.answer(f"Hello, <b>{message.from_user.full_name}!</b>")
+async def insert_user(user_id):
+    # Insert user ID into the MongoDB users collection
+    await users_collection.update_one({"_id": user_id}, {"$set": {"_id": user_id}}, upsert=True)
 
+async def insert_channel(channel_id):
+    # Insert channel ID into the MongoDB channels collection
+    # You can customize this function based on your data structure
+    pass
 
-@start_router.chat_member(Command("start"))
-async def command_start_group_handler(message: Message, chat_member: Chat):
-    """
-    This handler receives messages with `/start` command in a group or channel
-    """
-    chat_id = message.chat.id
-    group_collection.update_one({"_id": chat_id}, {"$set": {"title": chat_member.title}}, upsert=True)
-    await message.reply(f"Hello, {chat_member.title} group member!")
+async def get_stats():
+    # Retrieve the total number of users and channels from MongoDB
+    total_users = await users_collection.count_documents({})
+    total_channels = await channels_collection.count_documents({})
+    return total_users, total_channels
 
+# Define a router for handling /stats command
+stats_router = DefaultRouter()
 
-async def stats_command_handler(message: Message):
-    """
-    This handler receives messages with `/stats` command
-    """
-    total_users = user_collection.count_documents({})
-    total_groups = group_collection.count_documents({})
-    await message.answer(f"Total users: {total_users}\nTotal groups: {total_groups}")
+@stats_router.message(filters.Command("stats"))
+async def command_stats_handler(message: types.Message):
+    total_users, total_channels = await get_stats()
+    await message.answer(f"Total Users: {total_users}\nTotal Channels: {total_channels}")
+
+async def main() -> None:
+    # Dispatcher is a root router
+    dp = Dispatcher()
+    dp.middleware.setup(LoggingMiddleware())
+
+    # Register routers
+    dp.include_router(stats_router)
+    
+    # Initialize Bot instance with a default parse mode using DefaultBotProperties
+    bot = Bot(TOKEN, default=types.DefaultBot)
+
+    # Start polling
+    await dp.start_polling(bot)
+
+    # Send a message to the specified channel indicating that the bot is now alive
+    await bot.send_message(chat_id=CHANNEL_ID, text="Bot is now alive!", parse_mode=ParseMode.HTML)
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-
-    dp = Dispatcher()
-    dp.include_router(start_router)
-    dp.register_message_handler(stats_command_handler, commands="stats")
-
-    bot = Bot(TOKEN)
-    dp.run_polling(bot)
+    asyncio.run(main())
