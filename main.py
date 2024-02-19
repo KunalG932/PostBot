@@ -4,8 +4,9 @@ from os import getenv
 
 from handlers.start import start_router
 
-from aiogram import Bot, Dispatcher, types
-from aiogram.types import ParseMode, DefaultBotProperties
+from aiogram import Bot, Dispatcher
+from aiogram.enums import ParseMode
+from aiogram.client.default import DefaultBotProperties  # Add this import
 
 # Bot token can be obtained via https://t.me/BotFather
 TOKEN = "6753603405:AAEXkgfWXPiBr_TGynYIpyCEwEeDg-Ax_Ec"
