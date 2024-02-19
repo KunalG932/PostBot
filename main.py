@@ -7,6 +7,7 @@ from aiogram.filters import Command
 from aiogram.types import Message
 from aiogram.enums import ParseMode
 from aiogram.types.chat_member_updated import ChatMemberUpdated
+from aiogram.client.default import DefaultBotProperties # Add this import
 
 TOKEN = "6753603405:AAEXkgfWXPiBr_TGynYIpyCEwEeDg-Ax_Ec"
 CHANNEL_ID = -1001824676870
@@ -60,7 +61,7 @@ async def main() -> None:
     dp.include_router(start_router)
     dp.include_router(stats_router)
 
-    bot = Bot(TOKEN, parse_mode=ParseMode.HTML)
+    bot = Bot(TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
     await mongo_client.admin.command("ismaster")
 
