@@ -3,6 +3,7 @@ import logging
 from aiogram import Bot, Dispatcher, types, Router
 from aiogram.types import Message, Chat
 from aiogram.enums.chat_type import ChatType
+from aiogram.filters import Command
 
 from pymongo import MongoClient
 
