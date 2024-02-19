@@ -67,7 +67,8 @@ async def cmd_back(message: types.Message):
     # Re-send the original keyboard after returning
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="🌟 Create Post 🌟")]
+            [KeyboardButton(text="🌟 Create Post 🌟")],
+            [KeyboardButton(text="Chat")]
         ],
         resize_keyboard=True,
     )
