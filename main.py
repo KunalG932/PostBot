@@ -45,23 +45,6 @@ async def cmd_start(message: types.Message):
         upsert=True
     )
 
-@router.message(lambda message: message.text == "Chat")
-async def cmd_chat(message: types.Message):
-    # Create a new keyboard with options: Connect, Connected, Back
-    keyboard = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="Connect"), KeyboardButton(text="Connected")],
-            [KeyboardButton(text="🔙 Back")]
-        ],
-        resize_keyboard=True,
-    )
-
-    # Send the chat options
-    await message.answer(
-        "Choose an option for chat:",
-        reply_markup=keyboard,
-    )
-
 @router.message(lambda message: message.text == "🌟 Create Post 🌟")
 async def cmd_create_post(message: types.Message):
     # Create a new keyboard with options: Text, Media, Back
@@ -97,22 +80,27 @@ async def cmd_stats(message: types.Message):
     await message.reply(f"Total users: {total_users}")
 
 # Add a handler for processing the provided chat ID or username and connecting
-@router.message(lambda message: message.text == "Connect")
-async def cmd_connect(message: types.Message):
-    # Ask the user to provide the username or chat ID
-    await message.answer("Please provide the username or chat ID of the channel to connect.")
+# Handler for the "Chat" button
+@router.message(lambda message: message.text == "Chat")
+async def cmd_chat(message: types.Message):
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="Connect"), KeyboardButton(text="Connected")],
+            [KeyboardButton(text="🔙 Back"]
+        ],
+        resize_keyboard=True,
+    )
 
-    # Set a custom state to track the user's input
-    await router.storage.set_state(chat=message.chat.id, user=message.from_user.id, state="waiting_for_channel")
+    await message.answer(
+        "Choose an option:",
+        reply_markup=keyboard,
+    )
 
-# Handle user input after clicking "Connect"
-@router.message(state="waiting_for_channel")
-async def process_channel_input(message: types.Message, state: dict):
-    # Reset the state
-    await router.storage.reset_state(chat=message.chat.id, user=message.from_user.id)
-
-    # Get the provided channel identifier
-    channel_identifier = message.text.strip()
+# Handler for processing the provided username or chat ID and connecting
+@router.message(lambda message: message.text.startswith("Connect"))
+async def cmd_connect_channel(message: types.Message):
+    # Extract the channel username or chat ID from the message text
+    channel_identifier = message.text.split(maxsplit=1)[1].strip()
 
     try:
         # Check if the identifier is a chat ID (numeric)
@@ -143,14 +131,7 @@ async def process_channel_input(message: types.Message, state: dict):
         upsert=True
     )
 
-    # Check if the connection was successful
-    user_info = await db.users.find_one({"user_id": message.from_user.id})
-    connected_chat = user_info.get("connected_chat")
-
-    if connected_chat == chat_id:
-        await message.reply(f"You have successfully connected to the chat: {chat_id}")
-    else:
-        await message.reply("Invalid username or chat ID. Please make sure it's correct and try again.")
+    await message.reply(f"You have successfully connected to the chat: {chat_id}")
 
 
 @router.message(lambda message: message.text == "Connected")
