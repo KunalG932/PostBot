@@ -144,6 +144,26 @@ async def cmd_connect(message: types.Message):
 
     await message.reply(f"You have successfully connected to the chat: {chat_id}")
 
+async def get_chat_usernames(user_id):
+    # Retrieve connected chat from the user's information
+    user_info = await db.users.find_one({"user_id": user_id})
+
+    if user_info:
+        connected_chat = user_info.get("connected_chat")
+
+        if connected_chat:
+            # Query the MongoDB database to get the chat username based on the chat ID
+            chat_info = await db.chats.find_one({"chat_id": connected_chat})
+
+            if chat_info:
+                # Extract the chat username from the chat information
+                chat_username = chat_info.get("chat_username")
+
+                if chat_username:
+                    return [chat_username]
+
+    return []
+
 @router.message(lambda message: message.text == "Connected")
 async def cmd_connected_from_chat(message: types.Message):
     # Retrieve connected chat from the user's information
@@ -153,43 +173,32 @@ async def cmd_connected_from_chat(message: types.Message):
         connected_chat = user_info.get("connected_chat")
 
         if connected_chat:
-            # Get the actual channel name from your database or any source
-            channel_name = get_channel_name(connected_chat)  # Replace with your logic
+            # Get the list of chat usernames dynamically
+            chat_usernames = await get_chat_usernames(message.from_user.id)
 
-            # Create a keyboard with the connected channel name and a "Disconnect" option
+            # Create a keyboard with chat usernames and disconnect option
             keyboard = ReplyKeyboardMarkup(
-                keyboard=[[KeyboardButton(text=channel_name)], [KeyboardButton(text="Disconnect")]],
+                keyboard=[[KeyboardButton(text=username) for username in chat_usernames],
+                          [KeyboardButton(text="Disconnect")]],
                 resize_keyboard=True,
             )
 
-            await message.reply(
-                f"You are currently connected to the channel: {channel_name}",
-                reply_markup=keyboard,
-            )
+            await message.reply("You are currently connected to the chat: {}".format(connected_chat),
+                                reply_markup=keyboard)
         else:
             await message.reply("You are not currently connected to any chat. Use /connect to connect to a chat.")
     else:
         await message.reply("You are not currently connected to any chat. Use /connect to connect to a chat.")
 
-# Add a handler for processing the selected channel or disconnect command
-@router.message(lambda message: message.text.startswith("Channel") or message.text == "Disconnect")
-async def handle_channel_selection(message: types.Message):
-    if message.text == "Disconnect":
-        # Disconnect the channel
-        await db.users.update_one(
-            {"user_id": message.from_user.id},
-            {"$unset": {"connected_chat": ""}},
-        )
-        await message.reply("You have successfully disconnected from the channel.")
-    else:
-        # Handle the selected channel (you may implement your logic here)
-        # Generate a new keyboard with the selected channel name and a "Disconnect" option
-        disconnect_keyboard = ReplyKeyboardMarkup(
-            keyboard=[[KeyboardButton(text=message.text)], [KeyboardButton(text="Disconnect")]],
-            resize_keyboard=True,
-        )
+@router.message(lambda message: message.text == "Disconnect")
+async def cmd_disconnect(message: types.Message):
+    # Update user information to disconnect from the chat
+    await db.users.update_one(
+        {"user_id": message.from_user.id},
+        {"$unset": {"connected_chat": ""}},
+    )
 
-        await message.reply(f"You selected the channel: {message.text}", reply_markup=disconnect_keyboard)
+    await message.reply("You have successfully disconnected from the chat.")
 
 async def main() -> None:
     logging.basicConfig(level=logging.INFO)
