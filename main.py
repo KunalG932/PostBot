@@ -96,7 +96,7 @@ async def handle_text_option(message: types.Message, state: FSMContext):
     )
     await message.answer("Do you want to add buttons to your message?", reply_markup=keyboard)
 
-@router.message(lambda message: message.text == "Yes"), state=PostState.SAVING_MESSAGE)
+@router.message((lambda message: message.text == "Yes"), state=PostState.SAVING_MESSAGE)
 async def handle_add_buttons(message: types.Message, state: FSMContext):
     # Set the state to ADDING_BUTTONS to handle the button addition
     await PostState.ADDING_BUTTONS.set()
@@ -128,7 +128,7 @@ async def handle_button_format(message: types.Message, state: FSMContext):
     # Reset the state to the initial state
     await state.finish()
 
-@router.message(lambda message: message.text == "No"), state=PostState.SAVING_MESSAGE)
+@router.message((lambda message: message.text == "No"), state=PostState.SAVING_MESSAGE)
 async def handle_no_buttons(message: types.Message, state: FSMContext):
     # Get the saved message from the state
     data = await state.get_data()
