@@ -90,22 +90,21 @@ async def process_text_post(message: types.Message):
 
     await message.answer("Do you want to add buttons to your text post?", reply_markup=keyboard)
 
-@router.message(lambda message: message.text.lower() in {"yes", "no"})
-async def process_buttons_choice(message: types.Message):
-    choice = message.text.lower()
+@router.message(lambda message: message.text.lower() == "yes")
+async def ask_for_button_text(message: types.Message):
+    # Ask the user to provide the button text
+    await message.answer("Give your button text (e.g., My Button) + [URL]:")
 
-    if choice == "yes":
-        await message.answer("Give your button text (e.g., My Button) + [URL]:")
-    elif choice == "no":
-        await message.answer("This is the content of my text post.\n\nNo buttons added.")
-    else:
-        await message.answer("Invalid choice. No buttons added.")
+@router.message(lambda message: message.text.lower() == "no")
+async def process_no_buttons(message: types.Message):
+    await message.answer("This is the content of my text post.\n\nNo buttons added.")
 
 @router.message(lambda message: "+" in message.text and "[" in message.text and "]" in message.text)
 async def process_button_text(message: types.Message):
     button_text = message.text
 
     final_post = f"This is the content of my text post.\n\n{button_text}"
+    await message.answer(final_post)
 
 @router.message(Command("stats"))
 async def cmd_stats(message: types.Message):
