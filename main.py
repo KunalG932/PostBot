@@ -31,7 +31,7 @@ async def cmd_start(message: types.Message):
     
     # Your existing start command logic here...
 
-@dp.message_handler(content_types=types.ContentTypes.NEW_CHAT_MEMBERS)
+@stats_router.message(content_types=types.ContentTypes.NEW_CHAT_MEMBERS)
 async def new_chat_members(message: types.Message):
     # Check if the bot is added to a group or channel
     if bot.id in [user.id for user in message.new_chat_members]:
