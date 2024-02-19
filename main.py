@@ -102,14 +102,14 @@ async def cmd_connect(message: types.Message):
 @router.message(Command("connect"))
 async def cmd_connect(message: types.Message):
     # Get the command arguments from the message text
-    command_args = message.text.split(maxsplit=1)[1]
+    command_args = message.text.split(maxsplit=1)
 
-    if not command_args:
+    if len(command_args) < 2:
         await message.reply("Please provide the username or chat ID of the channel to connect.")
         return
 
     # Extract the channel username or chat ID from the command arguments
-    channel_identifier = command_args.strip()
+    channel_identifier = command_args[1].strip()
 
     try:
         # Check if the identifier is a chat ID (numeric)
