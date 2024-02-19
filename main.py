@@ -153,11 +153,43 @@ async def cmd_connected_from_chat(message: types.Message):
         connected_chat = user_info.get("connected_chat")
 
         if connected_chat:
-            await message.reply(f"You are currently connected to the chat: {connected_chat}")
+            # Get the actual channel name from your database or any source
+            channel_name = get_channel_name(connected_chat)  # Replace with your logic
+
+            # Create a keyboard with the connected channel name and a "Disconnect" option
+            keyboard = ReplyKeyboardMarkup(
+                keyboard=[[KeyboardButton(text=channel_name)], [KeyboardButton(text="Disconnect")]],
+                resize_keyboard=True,
+            )
+
+            await message.reply(
+                f"You are currently connected to the channel: {channel_name}",
+                reply_markup=keyboard,
+            )
         else:
             await message.reply("You are not currently connected to any chat. Use /connect to connect to a chat.")
     else:
         await message.reply("You are not currently connected to any chat. Use /connect to connect to a chat.")
+
+# Add a handler for processing the selected channel or disconnect command
+@router.message(lambda message: message.text.startswith("Channel") or message.text == "Disconnect")
+async def handle_channel_selection(message: types.Message):
+    if message.text == "Disconnect":
+        # Disconnect the channel
+        await db.users.update_one(
+            {"user_id": message.from_user.id},
+            {"$unset": {"connected_chat": ""}},
+        )
+        await message.reply("You have successfully disconnected from the channel.")
+    else:
+        # Handle the selected channel (you may implement your logic here)
+        # Generate a new keyboard with the selected channel name and a "Disconnect" option
+        disconnect_keyboard = ReplyKeyboardMarkup(
+            keyboard=[[KeyboardButton(text=message.text)], [KeyboardButton(text="Disconnect")]],
+            resize_keyboard=True,
+        )
+
+        await message.reply(f"You selected the channel: {message.text}", reply_markup=disconnect_keyboard)
 
 async def main() -> None:
     logging.basicConfig(level=logging.INFO)
