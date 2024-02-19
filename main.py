@@ -2,6 +2,7 @@ import asyncio
 import logging
 from aiogram import Bot, Dispatcher, types, Router
 from aiogram.types import Message, Chat
+from aiogram.enums.chat_type import ChatType
 
 from pymongo import MongoClient
 
@@ -25,7 +26,7 @@ group_collection = db[GROUP_COLLECTION_NAME]
 start_router = Router()
 
 
-@start_router.message(types.ChatType.PRIVATE, Command("start"))
+@start_router.message(ChatType.PRIVATE, Command("start"))
 async def command_start_handler(message: Message) -> None:
     """
     This handler receives messages with `/start` command in private chat
