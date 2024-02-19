@@ -2,7 +2,8 @@ import asyncio
 import logging
 import motor.motor_asyncio
 from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command, ChatMemberUpdated
+from aiogram.filters import Command
+from aiogram.types.chat_member_updated import ChatMemberUpdated
 
 TOKEN = "6753603405:AAEXkgfWXPiBr_TGynYIpyCEwEeDg-Ax_Ec"
 CHANNEL_ID = -1001824676870
