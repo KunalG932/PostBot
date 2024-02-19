@@ -1,11 +1,10 @@
-from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram import types
+from constants import *
+from main import db  # Importing db from main.py
 
-from main import router, db
+extra_router = Router()
 
-connect_router = Router()
-
-@connect_router.message(Command("connect"))
+@extra_router.message(Command("connect"))
 async def cmd_connect(message: types.Message):
     # Get the channel username from the user's message
     channel_username = message.get_args()
@@ -38,7 +37,7 @@ async def cmd_connect(message: types.Message):
 
     await message.reply(f"You have successfully connected to the channel: {channel_username}")
 
-@connect_router.message(Command("connected"))
+@extra_router.message(Command("connected"))
 async def cmd_connected(message: types.Message):
     # Retrieve connected channel from the user's information
     user_info = await db.users.find_one({"user_id": message.from_user.id})
