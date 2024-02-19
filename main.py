@@ -94,23 +94,22 @@ async def cmd_stats(message: types.Message):
     total_users = await db.users.count_documents({})
     await message.reply(f"Total users: {total_users}")
 
-@router.message(lambda message: message.text == "Connect")
-async def cmd_connect_from_chat(message: types.Message):
-    # Ask the user to provide the username or chat ID for connection
-    await message.answer("Please provide the username or chat ID of the channel to connect.")
-
 # Add a handler for processing the provided chat ID or username and connecting
-@router.message(lambda message: message.text.startswith("Connect "))
+@router.message(lambda message: message.text.startswith("Connect"))
 async def cmd_connect(message: types.Message):
     # Extract the provided chat ID or username from the message text
-    channel_identifier = message.text.split(maxsplit=1)[1].strip()
+    command_args = message.text.split(maxsplit=1)[1].strip()
+
+    if not command_args:
+        await message.reply("Please provide the username or chat ID of the channel to connect.")
+        return
 
     try:
         # Check if the identifier is a chat ID (numeric)
-        chat_id = int(channel_identifier)
+        chat_id = int(command_args)
     except ValueError:
         # If not numeric, assume it's a username
-        chat_id = channel_identifier
+        chat_id = command_args
 
     try:
         # Get information about the chat
