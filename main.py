@@ -2,12 +2,7 @@ import asyncio
 import logging
 import motor.motor_asyncio
 from aiogram import Bot, Dispatcher, types
-from aiogram.enums.content_type import ContentType
-from aiogram import Router
-from aiogram.filters import Command
-from aiogram.types import Message
-from aiogram.enums import ParseMode
-from aiogram.client.default import DefaultBotProperties
+from aiogram.filters import Command, ChatMemberUpdated
 
 TOKEN = "6753603405:AAEXkgfWXPiBr_TGynYIpyCEwEeDg-Ax_Ec"
 CHANNEL_ID = -1001824676870
@@ -16,8 +11,8 @@ MONGO_URI = "mongodb+srv://exp69:exp69@cluster0.kr93qbe.mongodb.net/?retryWrites
 mongo_client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
 db = mongo_client["Postbot"]  # Replace with your desired database name
 
-start_router = Router()
-stats_router = Router()
+start_router = Dispatcher()
+stats_router = Dispatcher()
 
 
 @start_router.message(Command("start"))
@@ -32,19 +27,7 @@ async def cmd_start(message: types.Message):
     
     # Your existing start command logic here...
 
-@stats_router.message(ContentType.NEW_CHAT_MEMBERS)
-async def new_chat_members(message: types.Message):
-    # Check if the bot is added to a group or channel
-    if bot.id in [user.id for user in message.new_chat_members]:
-        # Insert channel ID into the database
-        await db.channels.update_one(
-            {"channel_id": message.chat.id},
-            {"$set": {"channel_id": message.chat.id}},
-            upsert=True
-        )
-
-
-@stats_router.message(Command("stats"))
+@start_router.message(Command("stats"))
 async def cmd_stats(message: types.Message):
     # Count total users
     total_users = await db.users.count_documents({})
@@ -56,21 +39,31 @@ async def cmd_stats(message: types.Message):
     await message.reply(f"Total users: {total_users}\nTotal channels/groups: {total_channels}")
 
 
+@stats_router.message(ChatMemberUpdated())
+async def new_chat_members(message: types.Message):
+    # Check if the bot is added to a group or channel
+    if bot.id in [user.id for user in message.new_chat_members]:
+        # Insert channel ID into the database
+        await db.channels.update_one(
+            {"channel_id": message.chat.id},
+            {"$set": {"channel_id": message.chat.id}},
+            upsert=True
+        )
+
+
 async def main() -> None:
     logging.basicConfig(level=logging.INFO)
 
     dp = Dispatcher()
-    dp.include_routers(
-        start_router,
-        stats_router,
-    )
+    dp.register_router(start_router)
+    dp.register_router(stats_router)
 
-    bot = Bot(TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    bot = Bot(TOKEN)
 
     await mongo_client.admin.command("ismaster")
 
     await dp.start_polling(bot)
-    await bot.send_message(chat_id=CHANNEL_ID, text="Bot is now alive!", parse_mode=ParseMode.HTML)
+    await bot.send_message(chat_id=CHANNEL_ID, text="Bot is now alive!")
 
 
 if __name__ == "__main__":
