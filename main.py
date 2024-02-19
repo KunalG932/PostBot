@@ -96,52 +96,50 @@ async def cmd_stats(message: types.Message):
 
 # Add a handler for processing the provided chat ID or username and connecting
 @router.message(lambda message: message.text == "Connect")
-async def cmd_connect_options(message: types.Message):
-    # Ask for the chat ID or username to connect
+async def cmd_connect(message: types.Message):
+    # Ask the user to provide the username or chat ID for connection
     await message.answer("Please provide the username or chat ID of the channel to connect.")
 
-    # Set the user's state to 'connecting' to track the ongoing process
-    await db.users.update_one(
-        {"user_id": message.from_user.id},
-        {"$set": {"user_state": "connecting"}},
-        upsert=True
-    )
+    # Wait for the user's response
+    response = await dp.wait_for(lambda event: event.message.from_user.id == message.from_user.id)
 
-@router.message(lambda message: db.users.find_one({"user_id": message.from_user.id})["user_state"] == "connecting")
-async def cmd_connect_channel(message: types.Message):
-    # Extract the provided channel identifier
-    channel_identifier = message.text.strip()
+    # Extract the provided chat ID or username from the user's response
+    command_args = response.message.text.strip()
+
+    if not command_args:
+        await response.message.reply("Please provide the username or chat ID of the channel to connect.")
+        return
 
     try:
         # Check if the identifier is a chat ID (numeric)
-        chat_id = int(channel_identifier)
+        chat_id = int(command_args)
     except ValueError:
         # If not numeric, assume it's a username
-        chat_id = channel_identifier
+        chat_id = command_args
 
     try:
         # Get information about the chat
-        chat_info = await message.bot.get_chat(chat_id)
+        chat_info = await response.message.bot.get_chat(chat_id)
 
         # Check if the bot is an administrator in the chat
         if not chat_info.permissions.can_invite_users:
-            await message.reply("Bot must be an admin in the chat to connect. Please promote the bot and try again.")
+            await response.message.reply("Bot must be an admin in the chat to connect. Please promote the bot and try again.")
             return
     except types.ChatNotFound:
-        await message.reply("Chat not found. Please make sure the chat exists and the bot has access to it.")
+        await response.message.reply("Chat not found. Please make sure the chat exists and the bot has access to it.")
         return
     except Exception as e:
-        await message.reply(f"An error occurred: {e}")
+        await response.message.reply(f"An error occurred: {e}")
         return
 
-    # Update user information with connected chat and reset user state
+    # Update user information with connected chat
     await db.users.update_one(
         {"user_id": message.from_user.id},
-        {"$set": {"connected_chat": chat_id, "user_state": None}},
+        {"$set": {"connected_chat": chat_id}},
         upsert=True
     )
 
-    await message.reply(f"You have successfully connected to the chat: {chat_id}")
+    await response.message.reply(f"You have successfully connected to the chat: {chat_id}")
 
 @router.message(lambda message: message.text == "Connected")
 async def cmd_connected_from_chat(message: types.Message):
