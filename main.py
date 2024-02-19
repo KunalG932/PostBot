@@ -33,24 +33,10 @@ async def cmd_start(message: types.Message):
 async def cmd_stats(message: types.Message):
     # Count total users
     total_users = await db.users.count_documents({})
-    
-    # Count total channels/groups
-    total_channels = await db.channels.count_documents({})
 
     # Send the stats message
-    await message.reply(f"Total users: {total_users}\nTotal channels/groups: {total_channels}")
+    await message.reply(f"Total users: {total_users}")
 
-@app.message_handler(content_types=types.ContentType.NEW_CHAT_MEMBERS)
-async def handle_new_chat_members(message: types.Message):
-    for member in message.new_chat_members:
-        if member.id == bot.id:
-            # Insert channel ID into the database
-            await db.channels.update_one(
-                {"channel_id": message.chat.id},
-                {"$set": {"channel_id": message.chat.id}},
-                upsert=True
-            )
-            break  # Break out of the loop after processing the bot's entry
 
 async def main() -> None:
     logging.basicConfig(level=logging.INFO)
