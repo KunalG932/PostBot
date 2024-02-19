@@ -6,7 +6,6 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import Message
 from aiogram.enums import ParseMode
-from aiogram.enums.content_type import NEW_CHAT_MEMBERS
 from aiogram.client.default import DefaultBotProperties # Add this import
 
 TOKEN = "6753603405:AAEXkgfWXPiBr_TGynYIpyCEwEeDg-Ax_Ec"
