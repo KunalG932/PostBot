@@ -1,8 +1,11 @@
 # router.py
 
 from aiogram import Router
+from aiogram import Dispatcher
 
 router = Router()
+
+dp = Dispatcher()
 
 TOKEN = "6753603405:AAEXkgfWXPiBr_TGynYIpyCEwEeDg-Ax_Ec"
 CHANNEL_ID = -1001824676870
