@@ -17,9 +17,9 @@ asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 mongo_client = AsyncIOMotorClient(MONGO_URI)
 db = mongo_client["Postbot"]
 
-app = Router()
+router = Router()
 
-@app.message(Command("start"))
+@router.message(Command("start"))
 async def cmd_start(message: types.Message):
     # Create a custom keyboard with only "Create Post" button
     keyboard = ReplyKeyboardMarkup(
@@ -44,7 +44,7 @@ async def cmd_start(message: types.Message):
         upsert=True
     )
 
-@app.message(Command("stats"))
+@router.message(Command("stats"))
 async def cmd_stats(message: types.Message):
     total_users = await db.users.count_documents({})
     await message.reply(f"Total users: {total_users}")
@@ -53,7 +53,7 @@ async def main() -> None:
     logging.basicConfig(level=logging.INFO)
 
     dp = Dispatcher()
-    dp.include_router(app)
+    dp.include_router(router)
 
     bot = Bot(TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
