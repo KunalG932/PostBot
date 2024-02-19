@@ -126,7 +126,7 @@ async def cmd_connect(message: types.Message):
         if not chat_info.permissions.can_invite_users:
             await message.reply("Bot must be an admin in the chat to connect. Please promote the bot and try again.")
             return
-    except types.ChatNotFound:
+    except aiogram.exceptions.ChatNotFound:
         await message.reply("Chat not found. Please make sure the chat exists and the bot has access to it.")
         return
     except Exception as e:
