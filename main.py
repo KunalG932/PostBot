@@ -8,7 +8,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 
 # Bot token can be obtained via https://t.me/BotFather
-TOKEN = getenv("6753603405:AAEXkgfWXPiBr_TGynYIpyCEwEeDg-Ax_Ec")
+TOKEN = "6753603405:AAEXkgfWXPiBr_TGynYIpyCEwEeDg-Ax_Ec"
 
 
 async def main() -> None:
