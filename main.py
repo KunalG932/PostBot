@@ -16,21 +16,20 @@ db = mongo_client["Postbot"]  # Replace with your desired database name
 start_router = Router()
 stats_router = Router()
 
-
 @start_router.message(Command("start"))
-async def cmd_start(message: types.Message):
+async def cmd_start(event: types.Message):
     # Insert user ID into the database
-    await message.answer(f"Hello, <b>{message.from_user.full_name}!</b>")
+    await event.answer(f"Hello, <b>{event.from_user.full_name}!</b>")
     await db.users.update_one(
-        {"user_id": message.from_user.id},
-        {"$set": {"user_id": message.from_user.id}},
+        {"user_id": event.from_user.id},
+        {"$set": {"user_id": event.from_user.id}},
         upsert=True
     )
     
     # Your existing start command logic here...
 
 @start_router.message(Command("stats"))
-async def cmd_stats(message: types.Message):
+async def cmd_stats(event: types.Message):
     # Count total users
     total_users = await db.users.count_documents({})
     
@@ -38,29 +37,26 @@ async def cmd_stats(message: types.Message):
     total_channels = await db.channels.count_documents({})
 
     # Send the stats message
-    await message.reply(f"Total users: {total_users}\nTotal channels/groups: {total_channels}")
-
+    await event.reply(f"Total users: {total_users}\nTotal channels/groups: {total_channels}")
 
 @stats_router.message(ChatMemberUpdated)
-async def new_chat_members(message: types.Message):
-    # Check if the bot is added to a group or channel
-    if bot.id in [user.user.id for user in message.new_chat_members]:
-        # Insert channel ID into the database
-        await db.channels.update_one(
-            {"channel_id": message.chat.id},
-            {"$set": {"channel_id": message.chat.id}},
-            upsert=True
-        )
-
+async def new_chat_members(event: types.Message):
+    for member in event.new_chat_members:
+        # Check if the bot is added to a group or channel
+        if member.user.id == event.bot.id:
+            # Insert channel ID into the database
+            await db.channels.update_one(
+                {"channel_id": event.chat.id},
+                {"$set": {"channel_id": event.chat.id}},
+                upsert=True
+            )
 
 async def main() -> None:
     logging.basicConfig(level=logging.INFO)
 
     dp = Dispatcher()
-    dp.include_routers(
-        start_router,
-        stats_router,
-    )
+    dp.include_router(start_router)
+    dp.include_router(stats_router)
 
     bot = Bot(TOKEN)
 
@@ -68,7 +64,6 @@ async def main() -> None:
 
     await dp.start_polling(bot)
     await bot.send_message(chat_id=CHANNEL_ID, text="Bot is now alive!")
-
 
 if __name__ == "__main__":
     asyncio.run(main())
