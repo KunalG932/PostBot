@@ -95,6 +95,12 @@ async def cmd_stats(message: types.Message):
     await message.reply(f"Total users: {total_users}")
 
 # Add a handler for processing the provided chat ID or username and connecting
+@router.message(lambda message: message.text == "Connect")
+async def cmd_connect_from_chat(message: types.Message):
+    # Ask the user to provide the username or chat ID for connection
+    await message.answer("Please provide the username or chat ID of the channel to connect.")
+
+# Add a handler for processing the provided chat ID or username and connecting
 @router.message(lambda message: message.text.startswith("Connect"))
 async def cmd_connect(message: types.Message):
     # Extract the provided chat ID or username from the message text
