@@ -20,7 +20,7 @@ stats_router = Router()
 @start_router.message(Command("start"))
 async def cmd_start(event: types.Message):
     # Insert user ID into the database
-    await message.answer(f"Hello, <b>{message.from_user.full_name}!</b>")
+    await event.answer(f"Hello, <b>{message.from_user.full_name}!</b>")
     await db.users.update_one(
         {"user_id": event.from_user.id},
         {"$set": {"user_id": event.from_user.id}},
