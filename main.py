@@ -122,14 +122,18 @@ async def cmd_connect(message: types.Message):
 
 @router.message(Command("connected"))
 async def cmd_connected(message: types.Message):
-    # Retrieve connected channel from the user's information
+    # Retrieve connected chat from the user's information
     user_info = await db.users.find_one({"user_id": message.from_user.id})
 
-    if user_info and "connected_channel" in user_info:
-        connected_channel = user_info["connected_channel"]
-        await message.reply(f"You are currently connected to the channel: {connected_channel}")
+    if user_info:
+        connected_chat = user_info.get("connected_chat")
+
+        if connected_chat:
+            await message.reply(f"You are currently connected to the chat: {connected_chat}")
+        else:
+            await message.reply("You are not currently connected to any chat. Use /connect to connect to a chat.")
     else:
-        await message.reply("You are not currently connected to any channel. Use /connect to connect to a channel.")
+        await message.reply("You are not currently connected to any chat. Use /connect to connect to a chat.")
 
 async def main() -> None:
     logging.basicConfig(level=logging.INFO)
