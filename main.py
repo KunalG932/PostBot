@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from os import getenv
 
 from handlers.start import start_router
 
