@@ -127,11 +127,14 @@ async def cmd_connect(message: types.Message):
         if not chat_info.permissions.can_invite_users:
             await message.reply("Bot must be an admin in the chat to connect. Please promote the bot and try again.")
             return
-    except aiogram.exceptions.ChatNotFound:
-        await message.reply("Chat not found. Please make sure the chat exists and the bot has access to it.")
+    except aiogram.exceptions.TelegramBadRequest as e:
+        if "chat not found" in str(e).lower():
+            await message.reply("Chat not found. Please make sure the chat exists and the bot has access to it.")
+        else:
+            await message.reply(f"An error occurred: {e}")
         return
     except Exception as e:
-        await message.reply(f"An error occurred: {e}")
+        await message.reply(f"An unexpected error occurred: {e}")
         return
 
     # Update user information with connected chat
