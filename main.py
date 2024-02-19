@@ -22,7 +22,8 @@ async def cmd_start(message: types.Message):
     # Create a custom keyboard with only "Create Post" button
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="🌟 Create Post 🌟")]
+            [KeyboardButton(text="🌟 Create Post 🌟")],
+            [KeyboardButton(text="Chat")]
         ],
         resize_keyboard=True,
     )
@@ -40,6 +41,23 @@ async def cmd_start(message: types.Message):
         {"user_id": message.from_user.id},
         {"$set": {"user_id": message.from_user.id}},
         upsert=True
+    )
+
+@router.message(lambda message: message.text == "Chat")
+async def cmd_chat(message: types.Message):
+    # Create a new keyboard with options: Connect, Connected, Back
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="Connect"), KeyboardButton(text="Connected")],
+            [KeyboardButton(text="🔙 Back")]
+        ],
+        resize_keyboard=True,
+    )
+
+    # Send the chat options
+    await message.answer(
+        "Choose an option for chat:",
+        reply_markup=keyboard,
     )
 
 @router.message(lambda message: message.text == "🌟 Create Post 🌟")
@@ -76,17 +94,16 @@ async def cmd_stats(message: types.Message):
     total_users = await db.users.count_documents({})
     await message.reply(f"Total users: {total_users}")
 
-@router.message(Command("connect"))
+@router.message(lambda message: message.text == "Connect")
+async def cmd_connect_from_chat(message: types.Message):
+    # Ask the user to provide the username or chat ID for connection
+    await message.answer("Please provide the username or chat ID of the channel to connect.")
+
+# Add a handler for processing the provided chat ID or username and connecting
+@router.message(lambda message: message.text.startswith("Connect "))
 async def cmd_connect(message: types.Message):
-    # Get the command arguments from the message text
-    command_args = message.text.split(maxsplit=1)[1]
-
-    if not command_args:
-        await message.reply("Please provide the username or chat ID of the channel to connect.")
-        return
-
-    # Extract the channel username or chat ID from the command arguments
-    channel_identifier = command_args.strip()
+    # Extract the provided chat ID or username from the message text
+    channel_identifier = message.text.split(maxsplit=1)[1].strip()
 
     try:
         # Check if the identifier is a chat ID (numeric)
@@ -119,9 +136,8 @@ async def cmd_connect(message: types.Message):
 
     await message.reply(f"You have successfully connected to the chat: {chat_id}")
 
-
-@router.message(Command("connected"))
-async def cmd_connected(message: types.Message):
+@router.message(lambda message: message.text == "Connected")
+async def cmd_connected_from_chat(message: types.Message):
     # Retrieve connected chat from the user's information
     user_info = await db.users.find_one({"user_id": message.from_user.id})
 
