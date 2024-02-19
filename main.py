@@ -78,12 +78,15 @@ async def cmd_stats(message: types.Message):
 
 @router.message(Command("connect"))
 async def cmd_connect(message: types.Message):
-    # Get the channel username from the user's message
-    channel_username = message.get_args()
+    # Get the command arguments from the message text
+    command_args = message.get_args()
 
-    if not channel_username:
+    if not command_args:
         await message.reply("Please provide the username of the channel to connect.")
         return
+
+    # Extract the channel username from the command arguments
+    channel_username = command_args.strip("@")
 
     try:
         # Get information about the chat (channel)
