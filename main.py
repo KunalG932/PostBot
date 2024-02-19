@@ -75,15 +75,12 @@ async def cmd_back(message: types.Message):
 
 @router.message(lambda message: message.text == "Text")
 async def cmd_text_post(message: types.Message):
-    # Ask the user to provide the text for the post
     await message.answer("Please provide the text for your text post:")
 
 @router.message(lambda message: message.text)
 async def process_text_post(message: types.Message):
-    # Save the text provided by the user
     text_content = message.text
 
-    # Ask if the user wants to add buttons
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="Yes"), KeyboardButton(text="No")]
@@ -98,22 +95,17 @@ async def process_buttons_choice(message: types.Message):
     choice = message.text.lower()
 
     if choice == "yes":
-        # Ask for the button format
-        await message.answer("Provide the button format (e.g., Button Text + [URL]):")
+        await message.answer("Give your button text (e.g., My Button) + [URL]:")
+    elif choice == "no":
+        await message.answer("This is the content of my text post.\n\nNo buttons added.")
     else:
-        # Skip adding buttons and provide the final post
-        await message.answer("This is the content of my text post.")
-        if choice == "no":
-            await message.answer("No buttons added.")
-        else:
-            await message.answer("Invalid choice. No buttons added.")
+        await message.answer("Invalid choice. No buttons added.")
 
 @router.message(lambda message: "+" in message.text and "[" in message.text and "]" in message.text)
-async def process_button_format(message: types.Message):
-    button_format = message.text
+async def process_button_text(message: types.Message):
+    button_text = message.text
 
-    # Parse the button format and provide the final post
-    await message.answer("This is the content of my text post.\n\n" + button_format)
+    final_post = f"This is the content of my text post.\n\n{button_text}"
 
 @router.message(Command("stats"))
 async def cmd_stats(message: types.Message):
