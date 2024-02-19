@@ -97,54 +97,52 @@ async def cmd_chat(message: types.Message):
         reply_markup=keyboard,
     )
 
-# Handler for processing the provided username or chat ID and connecting
-@router.message(lambda message: message.text.startswith("Connect"))
-async def cmd_connect_channel(message: types.Message):
+@router.message(lambda message: message.text == "Connect")
+async def cmd_connect(message: types.Message):
+    await message.answer("use command /connect username or chat ID of the channel to connect.\n Example: /connect @ProjectCodeXsupport or /connect -1001511142636")
+
+@router.message(Command("connect"))
+async def cmd_connect(message: types.Message):
+    # Get the command arguments from the message text
+    command_args = message.text.split(maxsplit=1)[1]
+
+    if not command_args:
+        await message.reply("Please provide the username or chat ID of the channel to connect.")
+        return
+
+    # Extract the channel username or chat ID from the command arguments
+    channel_identifier = command_args.strip()
+
     try:
-        # Extract the channel username or chat ID from the message text
-        channel_identifier = message.text[len("Connect"):].strip()
+        # Check if the identifier is a chat ID (numeric)
+        chat_id = int(channel_identifier)
+    except ValueError:
+        # If not numeric, assume it's a username
+        chat_id = channel_identifier
 
-        if channel_identifier:
-            print("Received channel identifier:", channel_identifier)
+    try:
+        # Get information about the chat
+        chat_info = await message.bot.get_chat(chat_id)
 
-            try:
-                # Check if the identifier is a chat ID (numeric)
-                chat_id = int(channel_identifier)
-            except ValueError:
-                # If not numeric, assume it's a username
-                chat_id = channel_identifier
-
-            print("Processed chat ID:", chat_id)
-
-            try:
-                # Get information about the chat
-                chat_info = await message.bot.get_chat(chat_id)
-
-                # Check if the bot is an administrator in the chat
-                if not chat_info.permissions.can_invite_users:
-                    await message.reply("Bot must be an admin in the chat to connect. Please promote the bot and try again.")
-                    return
-            except types.ChatNotFound:
-                await message.reply("Chat not found. Please make sure the chat exists and the bot has access to it.")
-                return
-            except Exception as e:
-                await message.reply(f"An error occurred: {e}")
-                return
-
-            # Update user information with connected chat
-            await db.users.update_one(
-                {"user_id": message.from_user.id},
-                {"$set": {"connected_chat": chat_id}},
-                upsert=True
-            )
-
-            await message.reply(f"You have successfully connected to the chat: {chat_id}")
-        else:
-            # Ask the user to provide the username or chat ID
-            await message.reply("Please provide the username or chat ID of the channel to connect.")
+        # Check if the bot is an administrator in the chat
+        if not chat_info.permissions.can_invite_users:
+            await message.reply("Bot must be an admin in the chat to connect. Please promote the bot and try again.")
+            return
+    except types.ChatNotFound:
+        await message.reply("Chat not found. Please make sure the chat exists and the bot has access to it.")
+        return
     except Exception as e:
-        print(f"An error occurred during connect command: {e}")
         await message.reply(f"An error occurred: {e}")
+        return
+
+    # Update user information with connected chat
+    await db.users.update_one(
+        {"user_id": message.from_user.id},
+        {"$set": {"connected_chat": chat_id}},
+        upsert=True
+    )
+
+    await message.reply(f"You have successfully connected to the chat: {chat_id}")
 
 @router.message(lambda message: message.text == "Connected")
 async def cmd_connected_from_chat(message: types.Message):
