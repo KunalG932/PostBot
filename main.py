@@ -33,7 +33,8 @@ async def cmd_start(message: types.Message):
     await message.answer(
         f"Hello, <b>{message.from_user.full_name} !</b>\n"
         "You can use the following options:",
-        reply_markup=keyboard
+        reply_markup=keyboard,
+        parse_mode=ParseMode.HTML
     )
 
     # Update user information in the MongoDB database
@@ -84,7 +85,8 @@ async def cmd_back(message: types.Message):
     await message.answer(
         f"Hello, <b>{message.from_user.full_name} !</b>\n"
         "You can use the following options:",
-        reply_markup=keyboard
+        reply_markup=keyboard,
+        parse_mode=ParseMode.HTML
     )
 
 @router.message(Command("stats"))
