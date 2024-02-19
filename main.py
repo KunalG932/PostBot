@@ -86,7 +86,7 @@ async def cmd_chat(message: types.Message):
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="Connect"), KeyboardButton(text="Connected")],
-            [KeyboardButton(text="🔙 Back"]
+            [KeyboardButton(text="🔙 Back")]
         ],
         resize_keyboard=True,
     )
