@@ -40,10 +40,10 @@ async def cmd_stats(message: types.Message):
     await message.reply(f"Total users: {total_users}\nTotal channels/groups: {total_channels}")
 
 
-@stats_router.message(ChatMemberUpdated())
+@stats_router.message(ChatMemberUpdated)
 async def new_chat_members(message: types.Message):
     # Check if the bot is added to a group or channel
-    if bot.id in [user.id for user in message.new_chat_members]:
+    if bot.id in [user.user.id for user in message.new_chat_members]:
         # Insert channel ID into the database
         await db.channels.update_one(
             {"channel_id": message.chat.id},
