@@ -11,6 +11,7 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.client.default import DefaultBotProperties
+from aiogram.enums.content_type import Text
 from constants import *
 
 # Set the event loop policy to uvloop
