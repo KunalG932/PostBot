@@ -24,23 +24,15 @@ app = Router()
 
 @app.message(Command("start"))
 async def cmd_start(message: types.Message):
-    # Create a custom keyboard with a "Create Post" button
-    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, keyboard=[[types.KeyboardButton("Create Post")]])
-
-    # Send the welcome message with the custom keyboard
-    await message.answer(
-        f"Hello, <b>{message.from_user.full_name}!</b>\n"
-        "You can use the following options:",
-        reply_markup=keyboard,
-        parse_mode=ParseMode.HTML
-    )
-
-    # Update user information in the MongoDB database
+    # Insert user ID into the database
+    await message.answer(f"Hello, <b>{message.from_user.full_name}!</b>")
     await db.users.update_one(
         {"user_id": message.from_user.id},
         {"$set": {"user_id": message.from_user.id}},
         upsert=True
     )
+    
+    # Your existing start command logic here...
 
 @app.message(Command("stats"))
 async def cmd_stats(message: types.Message):
