@@ -59,7 +59,7 @@ async def main() -> None:
     dp.include_router(start_router)
     dp.include_router(stats_router)
 
-    bot = Bot(TOKEN)
+    bot = Bot(TOKEN, parse_mode=ParseMode.HTML)
 
     await mongo_client.admin.command("ismaster")
 
