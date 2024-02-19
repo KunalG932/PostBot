@@ -6,7 +6,7 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import Message
 from aiogram.enums import ParseMode
-from aiogram.types.chat_member_updated import ChatMemberUpdated
+from aiogram.enums.content_type import NEW_CHAT_MEMBERS
 from aiogram.client.default import DefaultBotProperties # Add this import
 
 TOKEN = "6753603405:AAEXkgfWXPiBr_TGynYIpyCEwEeDg-Ax_Ec"
@@ -16,23 +16,22 @@ MONGO_URI = "mongodb+srv://exp69:exp69@cluster0.kr93qbe.mongodb.net/?retryWrites
 mongo_client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
 db = mongo_client["Postbot"]  # Replace with your desired database name
 
-start_router = Router()
-stats_router = Router()
+app = Router()
 
-@start_router.message(Command("start"))
-async def cmd_start(event: types.Message):
+@app.message(Command("start"))
+async def cmd_start(message: types.Message):
     # Insert user ID into the database
-    await event.answer(f"Hello, <b>{event.from_user.full_name}!</b>")
+    await message.answer(f"Hello, <b>{message.from_user.full_name}!</b>")
     await db.users.update_one(
-        {"user_id": event.from_user.id},
-        {"$set": {"user_id": event.from_user.id}},
+        {"user_id": message.from_user.id},
+        {"$set": {"user_id": message.from_user.id}},
         upsert=True
     )
     
     # Your existing start command logic here...
 
-@stats_router.message(Command("stats"))
-async def cmd_stats(event: types.Message):
+@app.message(Command("stats"))
+async def cmd_stats(message: types.Message):
     # Count total users
     total_users = await db.users.count_documents({})
     
@@ -40,17 +39,16 @@ async def cmd_stats(event: types.Message):
     total_channels = await db.channels.count_documents({})
 
     # Send the stats message
-    await event.reply(f"Total users: {total_users}\nTotal channels/groups: {total_channels}")
+    await message.reply(f"Total users: {total_users}\nTotal channels/groups: {total_channels}")
 
-@stats_router.message(ChatMemberUpdated)
-async def new_chat_members(event: types.Message):
-    for member in event.new_chat_members:
-        # Check if the bot is added to a group or channel
-        if member.user.id == event.bot.id:
+@app.message(F.NEW_CHAT_MEMBERS)
+async def handle_new_chat_members(message: types.Message):
+    for member in message.new_chat_members:
+        if member.id == bot.id:
             # Insert channel ID into the database
             await db.channels.update_one(
-                {"channel_id": event.chat_id},  # Fix here: use event.chat_id instead of event.chat.id
-                {"$set": {"channel_id": event.chat_id}},
+                {"channel_id": message.chat.id},
+                {"$set": {"channel_id": message.chat.id}},
                 upsert=True
             )
 
@@ -58,8 +56,7 @@ async def main() -> None:
     logging.basicConfig(level=logging.INFO)
 
     dp = Dispatcher()
-    dp.include_router(start_router)
-    dp.include_router(stats_router)
+    dp.include_router(app)
 
     bot = Bot(TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
