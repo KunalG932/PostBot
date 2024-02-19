@@ -3,7 +3,6 @@ import asyncio
 import uvloop  # Import uvloop
 import aiogram
 
-from motor.motor_asyncio import AsyncIOMotorClient
 from aiogram import Router
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
@@ -14,9 +13,6 @@ from constants import *
 
 # Set the event loop policy to uvloop
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-
-mongo_client = AsyncIOMotorClient(MONGO_URI)
-db = mongo_client["Postbot"]
 
 @router.message(Command("start"))
 async def cmd_start(message: types.Message):
