@@ -69,8 +69,11 @@ async def process_post_option(message: types.Message):
     # Your logic to handle the chosen option goes here
     await message.answer(f"You selected: {option}")
 
-@router.message(lambda message: message.text.lower() == "back")
+@router.message(lambda message: message.text.lower() == "🔙 Back")
 async def cmd_back(message: types.Message):
+    # Send a message acknowledging the "Back" button click
+    await message.answer("You returned to the previous menu.")
+
     # Re-send the original keyboard after returning
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
@@ -78,8 +81,13 @@ async def cmd_back(message: types.Message):
         ],
         resize_keyboard=True,
     )
-
-    await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
+    
+    await message.answer(
+        f"Hello, <b>{message.from_user.full_name} !</b>\n"
+        "You can use the following options:",
+        reply_markup=keyboard,
+        parse_mode=ParseMode.HTML
+    )
 
 @router.message(Command("stats"))
 async def cmd_stats(message: types.Message):
