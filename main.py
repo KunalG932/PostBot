@@ -71,9 +71,6 @@ async def process_post_option(message: types.Message):
 
 @router.message(lambda message: message.text.lower() == "back")
 async def cmd_back(message: types.Message):
-    # Send a message acknowledging the "Back" button click
-    await message.answer(f"You returned to the previous menu, <b>{message.from_user.full_name}</b>!")
-
     # Re-send the original keyboard after returning
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
