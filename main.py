@@ -50,7 +50,7 @@ async def cmd_create_post(message: types.Message):
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="Text"), KeyboardButton(text="Media")],
-            [KeyboardButton(text="🔙 Back")]
+            [KeyboardButton(text="Back")]
         ],
         resize_keyboard=True,
     )
@@ -82,12 +82,7 @@ async def cmd_back(message: types.Message):
         resize_keyboard=True,
     )
     
-    await message.answer(
-        f"Hello, <b>{message.from_user.full_name} !</b>\n"
-        "You can use the following options:",
-        reply_markup=keyboard,
-        parse_mode=ParseMode.HTML
-    )
+    await message.answer("Hello, <b>{message.from_user.full_name} !</b>\nYou can use the following options:", reply_markup=keyboard)
 
 @router.message(Command("stats"))
 async def cmd_stats(message: types.Message):
