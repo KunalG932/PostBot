@@ -1,6 +1,7 @@
 import logging
 import asyncio
 import uvloop  # Import uvloop
+import aiogram
 
 from motor.motor_asyncio import AsyncIOMotorClient
 from aiogram import Router
