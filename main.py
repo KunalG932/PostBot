@@ -96,26 +96,28 @@ async def cmd_stats(message: types.Message):
 
 # Add a handler for processing the provided chat ID or username and connecting
 @router.message(lambda message: message.text == "Connect")
-async def cmd_connect_from_chat(message: types.Message):
-    # Ask the user to provide the username or chat ID for connection
+async def cmd_connect_options(message: types.Message):
+    # Ask for the chat ID or username to connect
     await message.answer("Please provide the username or chat ID of the channel to connect.")
 
-# Add a handler for processing the provided chat ID or username and connecting
-@router.message(lambda message: message.text.startswith("Connect"))
-async def cmd_connect(message: types.Message):
-    # Extract the provided chat ID or username from the message text
-    command_args = message.text.split(maxsplit=1)[1].strip()
+    # Set the user's state to 'connecting' to track the ongoing process
+    await db.users.update_one(
+        {"user_id": message.from_user.id},
+        {"$set": {"user_state": "connecting"}},
+        upsert=True
+    )
 
-    if not command_args:
-        await message.reply("Please provide the username or chat ID of the channel to connect.")
-        return
+@router.message(lambda message: db.users.find_one({"user_id": message.from_user.id})["user_state"] == "connecting")
+async def cmd_connect_channel(message: types.Message):
+    # Extract the provided channel identifier
+    channel_identifier = message.text.strip()
 
     try:
         # Check if the identifier is a chat ID (numeric)
-        chat_id = int(command_args)
+        chat_id = int(channel_identifier)
     except ValueError:
         # If not numeric, assume it's a username
-        chat_id = command_args
+        chat_id = channel_identifier
 
     try:
         # Get information about the chat
@@ -132,10 +134,10 @@ async def cmd_connect(message: types.Message):
         await message.reply(f"An error occurred: {e}")
         return
 
-    # Update user information with connected chat
+    # Update user information with connected chat and reset user state
     await db.users.update_one(
         {"user_id": message.from_user.id},
-        {"$set": {"connected_chat": chat_id}},
+        {"$set": {"connected_chat": chat_id, "user_state": None}},
         upsert=True
     )
 
