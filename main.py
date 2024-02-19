@@ -11,7 +11,6 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.client.default import DefaultBotProperties
-from aiogram.enums.content_type import Text
 from constants import *
 
 # Set the event loop policy to uvloop
@@ -80,7 +79,7 @@ class PostState(StatesGroup):
     SAVING_MESSAGE = State()
     ADDING_BUTTONS = State()
 
-@router.message(Text(equals="Text"))
+@router.message(lambda message: message.text == "Text")
 async def handle_text_option(message: types.Message, state: FSMContext):
     # Set the state to SAVING_MESSAGE to save the user's message
     await PostState.SAVING_MESSAGE.set()
