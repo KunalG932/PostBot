@@ -79,7 +79,7 @@ async def cmd_stats(message: types.Message):
 @router.message(Command("connect"))
 async def cmd_connect(message: types.Message):
     # Get the command arguments from the message text
-    command_args = message.get_command()[1:]
+    command_args = message.text.split(maxsplit=1)[1]
 
     if not command_args:
         await message.reply("Please provide the username of the channel to connect.")
@@ -111,7 +111,6 @@ async def cmd_connect(message: types.Message):
     )
 
     await message.reply(f"You have successfully connected to the channel: {channel_username}")
-
 
 @router.message(Command("connected"))
 async def cmd_connected(message: types.Message):
