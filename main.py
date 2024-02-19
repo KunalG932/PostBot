@@ -24,7 +24,20 @@ app = Router()
 
 @app.message(Command("start"))
 async def cmd_start(message: types.Message):
-    await message.answer(f"Hello, <b>{message.from_user.full_name}!</b>")
+    # Create a custom keyboard with a "Create Post" button
+    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    create_post_button = types.KeyboardButton("🌟 Create Post 🌟")
+    keyboard.add(create_post_button)
+
+    # Send the welcome message with the custom keyboard
+    await message.answer(
+        f"Hello, <b>{message.from_user.full_name}!</b>\n"
+        "You can use the following options:",
+        reply_markup=keyboard,
+        parse_mode=ParseMode.HTML
+    )
+
+    # Update user information in the MongoDB database
     await db.users.update_one(
         {"user_id": message.from_user.id},
         {"$set": {"user_id": message.from_user.id}},
