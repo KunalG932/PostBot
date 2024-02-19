@@ -102,10 +102,9 @@ async def cmd_chat(message: types.Message):
 async def cmd_connect_channel(message: types.Message):
     try:
         # Extract the channel username or chat ID from the message text
-        channel_parts = message.text.split(maxsplit=1)
+        channel_identifier = message.text[len("Connect"):].strip()
 
-        if len(channel_parts) > 1:
-            channel_identifier = channel_parts[1].strip()
+        if channel_identifier:
             print("Received channel identifier:", channel_identifier)
 
             try:
