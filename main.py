@@ -98,48 +98,54 @@ async def cmd_chat(message: types.Message):
     )
 
 # Handler for processing the provided username or chat ID and connecting
-# Handler for processing the provided username or chat ID and connecting
 @router.message(lambda message: message.text.startswith("Connect"))
 async def cmd_connect_channel(message: types.Message):
-    # Extract the channel username or chat ID from the message text
-    channel_parts = message.text.split(maxsplit=1)
+    try:
+        # Extract the channel username or chat ID from the message text
+        channel_parts = message.text.split(maxsplit=1)
 
-    if len(channel_parts) > 1:
-        channel_identifier = channel_parts[1].strip()
+        if len(channel_parts) > 1:
+            channel_identifier = channel_parts[1].strip()
+            print("Received channel identifier:", channel_identifier)
 
-        try:
-            # Check if the identifier is a chat ID (numeric)
-            chat_id = int(channel_identifier)
-        except ValueError:
-            # If not numeric, assume it's a username
-            chat_id = channel_identifier
+            try:
+                # Check if the identifier is a chat ID (numeric)
+                chat_id = int(channel_identifier)
+            except ValueError:
+                # If not numeric, assume it's a username
+                chat_id = channel_identifier
 
-        try:
-            # Get information about the chat
-            chat_info = await message.bot.get_chat(chat_id)
+            print("Processed chat ID:", chat_id)
 
-            # Check if the bot is an administrator in the chat
-            if not chat_info.permissions.can_invite_users:
-                await message.reply("Bot must be an admin in the chat to connect. Please promote the bot and try again.")
+            try:
+                # Get information about the chat
+                chat_info = await message.bot.get_chat(chat_id)
+
+                # Check if the bot is an administrator in the chat
+                if not chat_info.permissions.can_invite_users:
+                    await message.reply("Bot must be an admin in the chat to connect. Please promote the bot and try again.")
+                    return
+            except types.ChatNotFound:
+                await message.reply("Chat not found. Please make sure the chat exists and the bot has access to it.")
                 return
-        except types.ChatNotFound:
-            await message.reply("Chat not found. Please make sure the chat exists and the bot has access to it.")
-            return
-        except Exception as e:
-            await message.reply(f"An error occurred: {e}")
-            return
+            except Exception as e:
+                await message.reply(f"An error occurred: {e}")
+                return
 
-        # Update user information with connected chat
-        await db.users.update_one(
-            {"user_id": message.from_user.id},
-            {"$set": {"connected_chat": chat_id}},
-            upsert=True
-        )
+            # Update user information with connected chat
+            await db.users.update_one(
+                {"user_id": message.from_user.id},
+                {"$set": {"connected_chat": chat_id}},
+                upsert=True
+            )
 
-        await message.reply(f"You have successfully connected to the chat: {chat_id}")
-    else:
-        # Ask the user to provide the username or chat ID
-        await message.reply("Please provide the username or chat ID of the channel to connect.")
+            await message.reply(f"You have successfully connected to the chat: {chat_id}")
+        else:
+            # Ask the user to provide the username or chat ID
+            await message.reply("Please provide the username or chat ID of the channel to connect.")
+    except Exception as e:
+        print(f"An error occurred during connect command: {e}")
+        await message.reply(f"An error occurred: {e}")
 
 @router.message(lambda message: message.text == "Connected")
 async def cmd_connected_from_chat(message: types.Message):
