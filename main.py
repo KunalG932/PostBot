@@ -50,7 +50,7 @@ async def cmd_create_post(message: types.Message):
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="Text"), KeyboardButton(text="Media")],
-            [KeyboardButton(text="Back")]
+            [KeyboardButton(text="🔙 Back")]
         ],
         resize_keyboard=True,
     )
@@ -72,7 +72,7 @@ async def process_post_option(message: types.Message):
 @router.message(lambda message: message.text.lower() == "back")
 async def cmd_back(message: types.Message):
     # Send a message acknowledging the "Back" button click
-    await message.answer("You returned to the previous menu.")
+    await message.answer(f"You returned to the previous menu, <b>{message.from_user.full_name}</b>!")
 
     # Re-send the original keyboard after returning
     keyboard = ReplyKeyboardMarkup(
@@ -81,8 +81,8 @@ async def cmd_back(message: types.Message):
         ],
         resize_keyboard=True,
     )
-    
-    await message.answer("Hello, <b>{message.from_user.full_name} !</b>\nYou can use the following options:", reply_markup=keyboard)
+
+    await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
 
 @router.message(Command("stats"))
 async def cmd_stats(message: types.Message):
