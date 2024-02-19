@@ -78,30 +78,43 @@ async def cmd_text_option(message: types.Message):
     # Ask the user to provide a text message for the post
     await message.answer("Please provide your text message for the post.")
 
+@router.message(lambda message: message.text.lower() == "yes")
+async def cmd_yes_add_buttons(message: types.Message):
+    # Provide instructions for adding buttons
+    await message.answer(
+        "To add buttons, use the following format:\n"
+        "[Button text + Button URL]\n"
+        "For example:\n"
+        "[Translator + https://t.me/TransioBot]\n"
+        "[Text + https://example.com]"
+    )
+
+@router.message(lambda message: message.text.lower() == "no")
+async def cmd_no_add_buttons(message: types.Message):
+    # Reply to the user that the post is ready to send to the channel
+    await message.answer("Your post is ready to send to the channel!")
+
 @router.message()
 async def process_text_message(message: types.Message):
     # Save the user's text as a post
     post_text = message.reply_to_message.text if message.reply_to_message else message.text
 
-    # Process the post_text as needed (for example, extract buttons)
-    # For simplicity, let's assume the user provides buttons in the specified format
-
-    # Check if the user provided buttons in the specified format
+    # Check if the post_text contains buttons in the specified format
     if "[button" in post_text.lower():
         # Process buttons and extract them
         buttons = process_buttons(post_text)
 
-        # Do something with the extracted buttons (e.g., send them to the channel)
-        await send_buttons_to_channel(message, buttons)
+        # Send the post with buttons to the channel
+        await send_post_with_buttons(message, post_text, buttons)
 
-        # Reply to the user that the post is ready to send to the channel
-        await message.answer("Your post is ready to send to the channel!")
+        # Reply to the user that the post with buttons is ready
+        await message.answer("Your post with buttons is ready to send to the channel!")
     else:
         # If no buttons provided, save the post without buttons
         await db.posts.insert_one({"user_id": message.from_user.id, "text": post_text})
 
-        # Reply to the user that the post is ready to send to the channel
-        await message.answer("Your post is ready to send to the channel!")
+        # Reply to the user that the post without buttons is ready
+        await message.answer("Your post without buttons is ready to send to the channel!")
 
 # Function to process buttons in the specified format
 def process_buttons(post_text):
@@ -112,13 +125,17 @@ def process_buttons(post_text):
 
     return buttons
 
-# Function to send buttons to the channel
-async def send_buttons_to_channel(message, buttons):
-    # Implement your logic to send buttons to the channel
+# Function to send the post with buttons to the channel
+async def send_post_with_buttons(message, post_text, buttons):
+    # Implement your logic to send the post with buttons to the channel
     # For simplicity, let's assume you have a channel_id variable
     channel_id = CHANNEL_ID
-    buttons_text = " ".join(buttons)
-    await message.bot.send_message(channel_id, buttons_text)
+
+    # Join the buttons and add them to the post_text
+    post_with_buttons = f"{post_text}\n\n{' '.join(buttons)}"
+
+    # Send the complete post with buttons to the channel
+    await message.bot.send_message(channel_id, post_with_buttons)
 
 @router.message(Command("stats"))
 async def cmd_stats(message: types.Message):
