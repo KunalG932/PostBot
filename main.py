@@ -1,42 +1,40 @@
-import asyncio
 import logging
-import motor.motor_asyncio
+import asyncio
+import uvloop  # Import uvloop
+
+from motor.motor_asyncio import AsyncIOMotorClient
 from aiogram import Router
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import Message
 from aiogram.enums import ParseMode
-from aiogram.client.default import DefaultBotProperties # Add this import
+from aiogram.client.default import DefaultBotProperties
 
 TOKEN = "6753603405:AAEXkgfWXPiBr_TGynYIpyCEwEeDg-Ax_Ec"
 CHANNEL_ID = -1001824676870
 MONGO_URI = "mongodb+srv://exp69:exp69@cluster0.kr93qbe.mongodb.net/?retryWrites=true&w=majority"
 
-mongo_client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
-db = mongo_client["Postbot"]  # Replace with your desired database name
+# Set the event loop policy to uvloop
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+
+mongo_client = AsyncIOMotorClient(MONGO_URI)
+db = mongo_client["Postbot"]
 
 app = Router()
 
 @app.message(Command("start"))
 async def cmd_start(message: types.Message):
-    # Insert user ID into the database
     await message.answer(f"Hello, <b>{message.from_user.full_name}!</b>")
     await db.users.update_one(
         {"user_id": message.from_user.id},
         {"$set": {"user_id": message.from_user.id}},
         upsert=True
     )
-    
-    # Your existing start command logic here...
 
 @app.message(Command("stats"))
 async def cmd_stats(message: types.Message):
-    # Count total users
     total_users = await db.users.count_documents({})
-
-    # Send the stats message
     await message.reply(f"Total users: {total_users}")
-
 
 async def main() -> None:
     logging.basicConfig(level=logging.INFO)
