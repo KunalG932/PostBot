@@ -10,6 +10,7 @@ from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 from constants import *
+from handlers.connect import connect_router
 
 # Set the event loop policy to uvloop
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
@@ -82,7 +83,10 @@ async def main() -> None:
     logging.basicConfig(level=logging.INFO)
 
     dp = Dispatcher()
-    dp.include_router(router)
+    dp.include_routers(
+        router,
+        connect_router,
+    )
 
     bot = Bot(TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
