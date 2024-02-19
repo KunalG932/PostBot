@@ -198,7 +198,14 @@ async def cmd_disconnect(message: types.Message):
         {"$unset": {"connected_chat": ""}},
     )
 
-    await message.reply("You have successfully disconnected from the chat.")
+    # Create a keyboard with the "Back" button
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="🔙 Back")]],
+        resize_keyboard=True,
+    )
+
+    await message.reply("You have successfully disconnected from the chat. You can go back to the main menu.",
+                        reply_markup=keyboard)
 
 async def main() -> None:
     logging.basicConfig(level=logging.INFO)
