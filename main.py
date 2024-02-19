@@ -17,8 +17,6 @@ asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 mongo_client = AsyncIOMotorClient(MONGO_URI)
 db = mongo_client["Postbot"]
 
-dp = Dispatcher()
-
 @router.message(Command("start"))
 async def cmd_start(message: types.Message):
     # Create a custom keyboard with only "Create Post" button
