@@ -2,6 +2,10 @@
 
 from aiogram import Router
 from aiogram import Dispatcher
+from motor.motor_asyncio import AsyncIOMotorClient
+
+mongo_client = AsyncIOMotorClient(MONGO_URI)
+db = mongo_client["Postbot"]      
 
 router = Router()
 
