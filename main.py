@@ -138,8 +138,8 @@ async def cmd_connect_channel(message: types.Message):
 
         await message.reply(f"You have successfully connected to the chat: {chat_id}")
     else:
+        # Ask the user to provide the username or chat ID
         await message.reply("Please provide the username or chat ID of the channel to connect.")
-
 
 @router.message(lambda message: message.text == "Connected")
 async def cmd_connected_from_chat(message: types.Message):
