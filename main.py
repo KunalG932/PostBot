@@ -27,7 +27,7 @@ async def cmd_start(message: types.Message):
     # Create a custom keyboard with only "Create Post" button
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="Create Post")]
+            [KeyboardButton(text="🌟 Create Post 🌟")]
         ],
         resize_keyboard=True,
     )
