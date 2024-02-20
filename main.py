@@ -249,7 +249,8 @@ async def cmd_connected_from_chat(message: types.Message):
             # Create a keyboard with chat usernames and disconnect option
             keyboard = ReplyKeyboardMarkup(
                 keyboard=[[KeyboardButton(text=username) for username in chat_usernames],
-                          [KeyboardButton(text="Disconnect")]],
+                          [KeyboardButton(text="Disconnect")],
+                          [KeyboardButton(text="🔙 Back")]],
                 resize_keyboard=True,
             )
 
