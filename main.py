@@ -144,12 +144,14 @@ async def cmd_post_cancel(message: types.Message):
         else:
             await message.answer("No text found. Please use the 'Text' option to provide a text message first.")
 
-    # Remove the user's ID from the dictionary
-    del user_input_dict[message.from_user.id]
+        # Remove the user's ID from the dictionary
+        del user_input_dict[message.from_user.id]
     
     # Optionally, you can provide a response for the "CANCEL" action
-    elif message.text == "🚫 CANCEL":
+    if message.text == "🚫 CANCEL":
         await message.answer("Post canceled!")
+        # Remove the user's ID from the dictionary
+        del user_input_dict[message.from_user.id]
 
 @router.message(lambda message: message.text == "Connect")
 async def cmd_connect(message: types.Message):
