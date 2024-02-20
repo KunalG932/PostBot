@@ -153,6 +153,17 @@ async def cmd_post_cancel(message: types.Message):
         # Remove the user's ID from the dictionary
         del user_input_dict[message.from_user.id]
 
+    # Go back to the "🌟 Create Post 🌟" menu
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🌟 Create Post 🌟")],
+            [KeyboardButton(text="Chat")]
+        ],
+        resize_keyboard=True,
+    )
+
+    await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
+
 @router.message(lambda message: message.text == "Connect")
 async def cmd_connect(message: types.Message):
     await message.answer("use command /connect username or chat ID of the channel to connect.\n Example: /connect @ProjectCodeXsupport or /connect -1001511142636")
