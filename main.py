@@ -192,7 +192,8 @@ async def cmd_connect(message: types.Message):
         chat_info = await message.bot.get_chat(chat_id)
 
         # Check if the bot is an administrator in the chat
-        if not chat_info.permissions.can_send_messages:
+        bot_member = await message.bot.get_chat_member(chat_id, message.bot.id)
+        if not bot_member.status in ['administrator', 'creator']:
             await message.reply("Bot must be an admin in the chat to connect. Please promote the bot and try again.")
             return
     except aiogram.exceptions.TelegramBadRequest as e:
