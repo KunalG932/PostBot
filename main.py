@@ -12,6 +12,7 @@ from aiogram.client.default import DefaultBotProperties
 from constants import *
 from db import *
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.context import FSMContext
 
 class YourStateEnum(StatesGroup):
     text_input = State()
