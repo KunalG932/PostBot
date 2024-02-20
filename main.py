@@ -11,6 +11,10 @@ from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 from constants import *
 from db import *
+from aiogram.fsm.state import State, StatesGroup
+
+class YourStateEnum(StatesGroup):
+    text_input = State()
 
 # Set the event loop policy to uvloop
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
