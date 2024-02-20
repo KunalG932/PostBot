@@ -93,6 +93,56 @@ async def cmd_chat(message: types.Message):
         reply_markup=keyboard,
     )
 
+@router.message(lambda message: message.text == "Text")
+async def cmd_text_input(message: types.Message):
+    # Ask for text input
+    await message.answer("Please provide the text for your post.")
+
+    # Set a state to indicate that the next message should be treated as the post text
+    await YourStateEnum.text_input.set()
+
+@router.message(state=YourStateEnum.text_input)
+async def process_text_input(message: types.Message, state: FSMContext):
+    # Retrieve the text input from the message
+    post_text = message.text
+
+    # Save the text in the user's state (or your database, depending on your implementation)
+    await state.update_data(post_text=post_text)
+
+    # Provide a keyboard with a "POST" button
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="📬 POST")]],
+        resize_keyboard=True,
+    )
+
+    await message.answer("Text saved! Click the 'POST' button to post it in the connected chat.", reply_markup=keyboard)
+
+@router.message(lambda message: message.text == "📬 POST")
+async def cmd_post(message: types.Message, state: FSMContext):
+    # Retrieve the saved text from the user's state
+    data = await state.get_data()
+    post_text = data.get("post_text")
+
+    if post_text:
+        # Retrieve the connected chat ID from the user's information
+        user_info = await db.users.find_one({"user_id": message.from_user.id})
+        connected_chat = user_info.get("connected_chat")
+
+        if connected_chat:
+            # Post the message in the connected chat
+            try:
+                await message.bot.send_message(chat_id=connected_chat, text=post_text)
+                await message.answer("Message posted successfully!")
+            except Exception as e:
+                await message.answer(f"Error posting message: {e}")
+        else:
+            await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
+    else:
+        await message.answer("No text found. Please use the 'Text' option to provide a text message first.")
+
+    # Reset the user's state
+    await state.finish()
+
 @router.message(lambda message: message.text == "Connect")
 async def cmd_connect(message: types.Message):
     await message.answer("use command /connect username or chat ID of the channel to connect.\n Example: /connect @ProjectCodeXsupport or /connect -1001511142636")
