@@ -113,38 +113,43 @@ async def process_text_input(message: types.Message):
     # Save the text in the dictionary using the user's ID as the key
     user_input_dict[message.from_user.id] = post_text
 
-    # Provide a keyboard with a "POST" button
+    # Provide a keyboard with "POST" and "CANCEL" buttons
     keyboard = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="📬 POST")]],
+        keyboard=[[KeyboardButton(text="📬 POST"), KeyboardButton(text="🚫 CANCEL")]],
         resize_keyboard=True,
     )
 
-    await message.answer("Text saved! Click the 'POST' button to post it in the connected chat.", reply_markup=keyboard)
+    await message.answer("Text saved! Click the 'POST' button to post it in the connected chat or click 'CANCEL' to cancel the post.", reply_markup=keyboard)
 
-@router.message(lambda message: message.text == "📬 POST")
-async def cmd_post(message: types.Message):
+@router.message(lambda message: message.text in ["📬 POST", "🚫 CANCEL"])
+async def cmd_post_cancel(message: types.Message):
     # Retrieve the saved text from the dictionary using the user's ID as the key
     post_text = user_input_dict.get(message.from_user.id, "")
 
-    if post_text:
-        # Retrieve the connected chat ID from the user's information
-        user_info = await db.users.find_one({"user_id": message.from_user.id})
-        connected_chat = user_info.get("connected_chat")
+    if message.text == "📬 POST":
+        if post_text:
+            # Retrieve the connected chat ID from the user's information
+            user_info = await db.users.find_one({"user_id": message.from_user.id})
+            connected_chat = user_info.get("connected_chat")
 
-        if connected_chat:
-            # Post the message in the connected chat
-            try:
-                await message.bot.send_message(chat_id=connected_chat, text=post_text)
-                await message.answer("Message posted successfully!")
-            except Exception as e:
-                await message.answer(f"Error posting message: {e}")
+            if connected_chat:
+                # Post the message in the connected chat
+                try:
+                    await message.bot.send_message(chat_id=connected_chat, text=post_text)
+                    await message.answer("Message posted successfully!")
+                except Exception as e:
+                    await message.answer(f"Error posting message: {e}")
+            else:
+                await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
         else:
-            await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
-    else:
-        await message.answer("No text found. Please use the 'Text' option to provide a text message first.")
+            await message.answer("No text found. Please use the 'Text' option to provide a text message first.")
 
     # Remove the user's ID from the dictionary
     del user_input_dict[message.from_user.id]
+    
+    # Optionally, you can provide a response for the "CANCEL" action
+    elif message.text == "🚫 CANCEL":
+        await message.answer("Post canceled!")
 
 @router.message(lambda message: message.text == "Connect")
 async def cmd_connect(message: types.Message):
