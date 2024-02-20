@@ -14,8 +14,7 @@ from db import *
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 
-class YourStateEnum(StatesGroup):
-    text_input = State()
+user_input_dict = {}
 
 # Set the event loop policy to uvloop
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
@@ -103,17 +102,16 @@ async def cmd_text_input(message: types.Message):
     # Ask for text input
     await message.answer("Please provide the text for your post.")
 
-    # Set a state to indicate that the next message should be treated as the post text
-    await YourStateEnum.text_input.set()
+    # Store the user's ID as the key and initialize an empty string as the value
+    user_input_dict[message.from_user.id] = ""
 
-@router.message(state=YourStateEnum.text_input)
+@router.message(lambda message: message.from_user.id in user_input_dict and user_input_dict[message.from_user.id] == "")
 async def process_text_input(message: types.Message):
     # Retrieve the text input from the message
     post_text = message.text
 
-    # Save the text in the user's state (or your database, depending on your implementation)
-    # Note: You can use message.from_user.id as a unique identifier for the user
-    await dp.storage.update_data(chat=message.chat.id, user=message.from_user.id, data={"post_text": post_text})
+    # Save the text in the dictionary using the user's ID as the key
+    user_input_dict[message.from_user.id] = post_text
 
     # Provide a keyboard with a "POST" button
     keyboard = ReplyKeyboardMarkup(
@@ -125,10 +123,8 @@ async def process_text_input(message: types.Message):
 
 @router.message(lambda message: message.text == "📬 POST")
 async def cmd_post(message: types.Message):
-    # Retrieve the saved text from the user's state (or your database)
-    # Note: You can use message.from_user.id as a unique identifier for the user
-    data = await dp.storage.get_data(chat=message.chat.id, user=message.from_user.id)
-    post_text = data.get("post_text")
+    # Retrieve the saved text from the dictionary using the user's ID as the key
+    post_text = user_input_dict.get(message.from_user.id, "")
 
     if post_text:
         # Retrieve the connected chat ID from the user's information
@@ -146,6 +142,9 @@ async def cmd_post(message: types.Message):
             await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
     else:
         await message.answer("No text found. Please use the 'Text' option to provide a text message first.")
+
+    # Remove the user's ID from the dictionary
+    del user_input_dict[message.from_user.id]
 
 @router.message(lambda message: message.text == "Connect")
 async def cmd_connect(message: types.Message):
