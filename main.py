@@ -121,7 +121,7 @@ async def process_text_input(message: types.Message):
 
     await message.answer("Text saved! Click the 'POST' button to post it in the connected chat or click 'CANCEL' to cancel the post.", reply_markup=keyboard)
 
-@router.message(lambda message: message.text == "📬 POST")
+@router.message(lambda message: message.text in ["📬 POST", "🚫 CANCEL"])
 async def cmd_post(message: types.Message):
     # Retrieve the saved text from the dictionary using the user's ID as the key
     user_data = user_input_dict.get(message.from_user.id, {})
