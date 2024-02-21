@@ -2,6 +2,7 @@ import logging
 import asyncio
 import uvloop
 import aiogram
+import re
 import html
 from aiogram import Router
 from aiogram import Bot, Dispatcher, types
