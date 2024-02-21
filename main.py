@@ -15,6 +15,7 @@ from db import *
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.text_decorations import *
+from typing import TYPE_CHECKING, Generator, List, Optional, Pattern, cast
 
 user_input_dict = {}
 
