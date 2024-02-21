@@ -99,21 +99,23 @@ async def cmd_chat(message: types.Message):
 
 @router.message(lambda message: message.text == "Text")
 async def cmd_text_input(message: types.Message):
-    # Ask for text input
-    await message.answer("Please provide the text for your post.")
+    await message.answer("Please provide the text for your post or a quote (if any). You can use HTML formatting.")
 
     # Store the user's ID as the key and initialize an empty dictionary as the value
-    user_input_dict[message.from_user.id] = {"text": ""}
+    user_input_dict[message.from_user.id] = {"text": "", "quote": ""}
 
 @router.message(lambda message: message.from_user.id in user_input_dict and user_input_dict[message.from_user.id]["text"] == "")
 async def process_text_input(message: types.Message):
     # Retrieve the text input from the message
     post_text = message.text
 
+    # Check if the text input includes HTML quote formatting
+    if post_text.startswith("<blockquote>") and post_text.endswith("</blockquote>"):
+        user_input_dict[message.from_user.id]["quote"] = post_text[len("<blockquote>") : -len("</blockquote>")]
+
     # Save the text in the dictionary using the user's ID as the key
     user_input_dict[message.from_user.id]["text"] = post_text
 
-    # Provide a keyboard with "POST" and "CANCEL" buttons
     keyboard = ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text="📬 POST"), KeyboardButton(text="🚫 CANCEL")]],
         resize_keyboard=True,
@@ -126,32 +128,42 @@ async def cmd_post(message: types.Message):
     # Retrieve the saved text from the dictionary using the user's ID as the key
     user_data = user_input_dict.get(message.from_user.id, {})
     post_text = user_data.get("text", "")
+    quote = user_data.get("quote", "")
 
-    if post_text:
-        # Check if the user provided a quote in addition to text
-        if "quote" in user_data:
-            post_text = f'"{user_data["quote"]}"\n\n{post_text}'
+    if quote:
+        post_text = f'<blockquote>{quote}</blockquote>\n\n{post_text}'
 
-        # Retrieve the connected chat ID from the user's information
-        user_info = await db.users.find_one({"user_id": message.from_user.id})
-        connected_chat = user_info.get("connected_chat")
+    # Retrieve the connected chat ID from the user's information
+    user_info = await db.users.find_one({"user_id": message.from_user.id})
+    connected_chat = user_info.get("connected_chat")
 
-        if connected_chat:
-            # Post the message in the connected chat
-            try:
-                await message.bot.send_message(chat_id=connected_chat, text=post_text)
-                await message.answer("Message posted successfully!")
-            except Exception as e:
-                await message.answer(f"Error posting message: {e}")
-        else:
-            await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
+    if connected_chat:
+        # Post the message in the connected chat
+        try:
+            text_entity = types.TextEntity(
+                type=types.text_entity.TextEntityType.BLOCKQUOTE,
+                offset=0,
+                length=len(post_text),
+            )
+            text = types.InputMessageContent(
+                message_text=post_text,
+                parse_mode=ParseMode.HTML,
+                entities=[text_entity],
+            )
+            await message.bot.send_message(
+                chat_id=connected_chat,
+                input_message_content=text,
+                reply_markup=None,
+            )
+            await message.answer("Message posted successfully!")
+        except Exception as e:
+            await message.answer(f"Error posting message: {e}")
     else:
-        await message.answer("No text found. Please use the 'Text' option to provide a text message first.")
+        await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
 
     # Remove the user's ID from the dictionary
     del user_input_dict[message.from_user.id]
 
-    
     # Optionally, you can provide a response for the "CANCEL" action
     if message.text == "🚫 CANCEL":
         await message.answer("Post canceled!")
