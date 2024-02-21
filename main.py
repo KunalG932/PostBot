@@ -13,6 +13,7 @@ from constants import *
 from db import *
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
+from aiogram.utils.text_decorations import *
 
 user_input_dict = {}
 
@@ -20,7 +21,7 @@ user_input_dict = {}
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 # Decorations
-class HtmlDecoration(types.TextDecoration):
+class HtmlDecoration(TextDecoration):
     BOLD_TAG = "b"
     ITALIC_TAG = "i"
     UNDERLINE_TAG = "u"
@@ -66,7 +67,7 @@ class HtmlDecoration(types.TextDecoration):
         return f"<{self.BLOCKQUOTE_TAG}>{value}</{self.BLOCKQUOTE_TAG}>"
 
 
-class MarkdownDecoration(types.TextDecoration):
+class MarkdownDecoration(TextDecoration):
     MARKDOWN_QUOTE_PATTERN: types.Pattern[str] = re.compile(r"([_*\[\]()~`>#+\-=|{}.!\\])")
 
     def link(self, value: str, link: str) -> str:
