@@ -102,16 +102,16 @@ async def cmd_text_input(message: types.Message):
     # Ask for text input
     await message.answer("Please provide the text for your post.")
 
-    # Store the user's ID as the key and initialize an empty string as the value
-    user_input_dict[message.from_user.id] = ""
+    # Store the user's ID as the key and initialize an empty dictionary as the value
+    user_input_dict[message.from_user.id] = {"text": ""}
 
-@router.message(lambda message: message.from_user.id in user_input_dict and user_input_dict[message.from_user.id] == "")
+@router.message(lambda message: message.from_user.id in user_input_dict and user_input_dict[message.from_user.id]["text"] == "")
 async def process_text_input(message: types.Message):
     # Retrieve the text input from the message
     post_text = message.text
 
     # Save the text in the dictionary using the user's ID as the key
-    user_input_dict[message.from_user.id] = post_text
+    user_input_dict[message.from_user.id]["text"] = post_text
 
     # Provide a keyboard with "POST" and "CANCEL" buttons
     keyboard = ReplyKeyboardMarkup(
@@ -121,31 +121,36 @@ async def process_text_input(message: types.Message):
 
     await message.answer("Text saved! Click the 'POST' button to post it in the connected chat or click 'CANCEL' to cancel the post.", reply_markup=keyboard)
 
-@router.message(lambda message: message.text in ["📬 POST", "🚫 CANCEL"])
-async def cmd_post_cancel(message: types.Message):
+@router.message(lambda message: message.text == "📬 POST")
+async def cmd_post(message: types.Message):
     # Retrieve the saved text from the dictionary using the user's ID as the key
-    post_text = user_input_dict.get(message.from_user.id, "")
+    user_data = user_input_dict.get(message.from_user.id, {})
+    post_text = user_data.get("text", "")
 
-    if message.text == "📬 POST":
-        if post_text:
-            # Retrieve the connected chat ID from the user's information
-            user_info = await db.users.find_one({"user_id": message.from_user.id})
-            connected_chat = user_info.get("connected_chat")
+    if post_text:
+        # Check if the user provided a quote in addition to text
+        if "quote" in user_data:
+            post_text = f'"{user_data["quote"]}"\n\n{post_text}'
 
-            if connected_chat:
-                # Post the message in the connected chat
-                try:
-                    await message.bot.send_message(chat_id=connected_chat, text=post_text)
-                    await message.answer("Message posted successfully!")
-                except Exception as e:
-                    await message.answer(f"Error posting message: {e}")
-            else:
-                await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
+        # Retrieve the connected chat ID from the user's information
+        user_info = await db.users.find_one({"user_id": message.from_user.id})
+        connected_chat = user_info.get("connected_chat")
+
+        if connected_chat:
+            # Post the message in the connected chat
+            try:
+                await message.bot.send_message(chat_id=connected_chat, text=post_text)
+                await message.answer("Message posted successfully!")
+            except Exception as e:
+                await message.answer(f"Error posting message: {e}")
         else:
-            await message.answer("No text found. Please use the 'Text' option to provide a text message first.")
+            await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
+    else:
+        await message.answer("No text found. Please use the 'Text' option to provide a text message first.")
 
-        # Remove the user's ID from the dictionary
-        del user_input_dict[message.from_user.id]
+    # Remove the user's ID from the dictionary
+    del user_input_dict[message.from_user.id]
+
     
     # Optionally, you can provide a response for the "CANCEL" action
     if message.text == "🚫 CANCEL":
