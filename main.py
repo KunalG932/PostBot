@@ -1,9 +1,8 @@
 import logging
 import asyncio
-import uvloop
+import uvloop  # Import uvloop
 import aiogram
-import re
-import html
+
 from aiogram import Router
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
@@ -14,120 +13,11 @@ from constants import *
 from db import *
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
-from aiogram.utils.text_decorations import *
-from typing import TYPE_CHECKING, Generator, List, Optional, Pattern, cast
 
 user_input_dict = {}
 
 # Set the event loop policy to uvloop
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-
-# Decorations
-class HtmlDecoration(TextDecoration):
-    BOLD_TAG = "b"
-    ITALIC_TAG = "i"
-    UNDERLINE_TAG = "u"
-    STRIKETHROUGH_TAG = "s"
-    SPOILER_TAG = "tg-spoiler"
-    EMOJI_TAG = "tg-emoji"
-    BLOCKQUOTE_TAG = "blockquote"
-
-    def link(self, value: str, link: str) -> str:
-        return f'<a href="{link}">{value}</a>'
-
-    def bold(self, value: str) -> str:
-        return f"<{self.BOLD_TAG}>{value}</{self.BOLD_TAG}>"
-
-    def italic(self, value: str) -> str:
-        return f"<{self.ITALIC_TAG}>{value}</{self.ITALIC_TAG}>"
-
-    def code(self, value: str) -> str:
-        return f"<code>{value}</code>"
-
-    def pre(self, value: str) -> str:
-        return f"<pre>{value}</pre>"
-
-    def pre_language(self, value: str, language: str) -> str:
-        return f'<pre><code class="language-{language}">{value}</code></pre>'
-
-    def underline(self, value: str) -> str:
-        return f"<{self.UNDERLINE_TAG}>{value}</{self.UNDERLINE_TAG}>"
-
-    def strikethrough(self, value: str) -> str:
-        return f"<{self.STRIKETHROUGH_TAG}>{value}</{self.STRIKETHROUGH_TAG}>"
-
-    def spoiler(self, value: str) -> str:
-        return f"<{self.SPOILER_TAG}>{value}</{self.SPOILER_TAG}>"
-
-    def quote(self, value: str) -> str:
-        return html.escape(value, quote=False)
-
-    def custom_emoji(self, value: str, custom_emoji_id: str) -> str:
-        return f'<{self.EMOJI_TAG} emoji-id="{custom_emoji_id}">{value}</tg-emoji>'
-
-    def blockquote(self, value: str) -> str:
-        return f"<{self.BLOCKQUOTE_TAG}>{value}</{self.BLOCKQUOTE_TAG}>"
-
-
-class MarkdownDecoration(TextDecoration):
-    MARKDOWN_QUOTE_PATTERN: Pattern[str] = re.compile(r"([_*\[\]()~`>#+\-=|{}.!\\])")
-
-    def link(self, value: str, link: str) -> str:
-        return f"[{value}]({link})"
-
-    def bold(self, value: str) -> str:
-        return f"*{value}*"
-
-    def italic(self, value: str) -> str:
-        return f"_\r{value}_\r"
-
-    def code(self, value: str) -> str:
-        return f"`{value}`"
-
-    def pre(self, value: str) -> str:
-        return f"```\n{value}\n```"
-
-    def pre_language(self, value: str, language: str) -> str:
-        return f"```{language}\n{value}\n```"
-
-    def underline(self, value: str) -> str:
-        return f"__\r{value}__\r"
-
-    def strikethrough(self, value: str) -> str:
-        return f"~{value}~"
-
-    def spoiler(self, value: str) -> str:
-        return f"||{value}||"
-
-    def quote(self, value: str) -> str:
-        return re.sub(pattern=self.MARKDOWN_QUOTE_PATTERN, repl=r"\\\1", string=value)
-
-    def custom_emoji(self, value: str, custom_emoji_id: str) -> str:
-        return self.link(value=value, link=f"tg://emoji?id={custom_emoji_id}")
-
-    def blockquote(self, value: str) -> str:
-        return "\n".join(f">{line}" for line in value.splitlines())
-
-
-html_decoration = HtmlDecoration()
-markdown_decoration = MarkdownDecoration()
-
-async def format_message(message: str, use_html: bool = True) -> str:
-    decoration = html_decoration if use_html else markdown_decoration
-
-    formatted_message = message
-
-    # Apply formatting based on decoration type
-    formatted_message = decoration.bold(formatted_message)
-    formatted_message = decoration.italic(formatted_message)
-    formatted_message = decoration.underline(formatted_message)
-    formatted_message = decoration.strikethrough(formatted_message)
-    formatted_message = decoration.spoiler(formatted_message)
-    formatted_message = decoration.quote(formatted_message)
-
-    # You can add more formatting options based on your requirements
-
-    return formatted_message
 
 @router.message(Command("start"))
 async def cmd_start(message: types.Message):
@@ -232,28 +122,30 @@ async def process_text_input(message: types.Message):
     await message.answer("Text saved! Click the 'POST' button to post it in the connected chat or click 'CANCEL' to cancel the post.", reply_markup=keyboard)
 
 @router.message(lambda message: message.text in ["📬 POST", "🚫 CANCEL"])
-async def cmd_post(message: types.Message):
+async def cmd_post_cancel(message: types.Message):
+    # Retrieve the saved text from the dictionary using the user's ID as the key
     post_text = user_input_dict.get(message.from_user.id, "")
-    
-    if post_text:
-        formatted_text = await format_message(post_text)
-        user_info = await db.users.find_one({"user_id": message.from_user.id})
-        connected_chat = user_info.get("connected_chat")
 
-        if connected_chat:
-            # Post the formatted message in the connected chat
-            try:
-                await message.bot.send_message(chat_id=connected_chat, text=formatted_text, parse_mode="HTML")
-                await message.answer("Message posted successfully!")
-            except Exception as e:
-                await message.answer(f"Error posting message: {e}")
+    if message.text == "📬 POST":
+        if post_text:
+            # Retrieve the connected chat ID from the user's information
+            user_info = await db.users.find_one({"user_id": message.from_user.id})
+            connected_chat = user_info.get("connected_chat")
+
+            if connected_chat:
+                # Post the message in the connected chat
+                try:
+                    await message.bot.send_message(chat_id=connected_chat, text=post_text)
+                    await message.answer("Message posted successfully!")
+                except Exception as e:
+                    await message.answer(f"Error posting message: {e}")
+            else:
+                await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
         else:
-            await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
-    else:
-        await message.answer("No text found. Please use the 'Text' option to provide a text message first.")
+            await message.answer("No text found. Please use the 'Text' option to provide a text message first.")
 
-    # Remove the user's ID from the dictionary
-    del user_input_dict[message.from_user.id]
+        # Remove the user's ID from the dictionary
+        del user_input_dict[message.from_user.id]
     
     # Optionally, you can provide a response for the "CANCEL" action
     if message.text == "🚫 CANCEL":
@@ -401,3 +293,4 @@ async def main() -> None:
 
 if __name__ == "__main__":
     asyncio.run(main())
+
