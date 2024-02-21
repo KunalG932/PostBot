@@ -123,7 +123,7 @@ async def process_text_input(message: types.Message):
 
     await message.answer("Text saved! Click the 'POST' button to post it in the connected chat or click 'CANCEL' to cancel the post.", reply_markup=keyboard)
 
-@router.message(lambda message: message.text in ["📬 POST", "🚫 CANCEL"])
+@router.message(lambda message: message.text == "📬 POST")
 async def cmd_post(message: types.Message):
     # Retrieve the saved text from the dictionary using the user's ID as the key
     user_data = user_input_dict.get(message.from_user.id, {})
@@ -140,21 +140,9 @@ async def cmd_post(message: types.Message):
     if connected_chat:
         # Post the message in the connected chat
         try:
-            text_entity = types.TextEntity(
-                type=types.text_entity.TextEntityType.BLOCKQUOTE,
-                offset=0,
-                length=len(post_text),
-            )
-            text = types.InputMessageContent(
-                message_text=post_text,
-                parse_mode=ParseMode.HTML,
-                entities=[text_entity],
-            )
-            await message.bot.send_message(
-                chat_id=connected_chat,
-                input_message_content=text,
-                reply_markup=None,
-            )
+            user = User(id=message.from_user.id, is_bot=False, **message.from_user.to_python())
+            text_quote = types.text_quote.TextQuote(user=user, text=post_text, parse_mode=ParseMode.HTML)
+            await message.bot.send_message(chat_id=connected_chat, text=text_quote)
             await message.answer("Message posted successfully!")
         except Exception as e:
             await message.answer(f"Error posting message: {e}")
