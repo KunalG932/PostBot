@@ -19,9 +19,6 @@ user_input_dict = {}
 # Set the event loop policy to uvloop
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
-class CloneState(StatesGroup):
-    waiting_for_message = State()
-
 @router.message(Command("start"))
 async def cmd_start(message: types.Message):
     # Create a custom keyboard with only "Create Post" button
@@ -53,7 +50,7 @@ async def cmd_create_post(message: types.Message):
     # Create a new keyboard with options: Text, Media, Back
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="Text"), KeyboardButton(text="Clone"), KeyboardButton(text="Quote")],
+            [KeyboardButton(text="Text"), KeyboardButton(text="Media"), KeyboardButton(text="Quote")],
             [KeyboardButton(text="🔙 Back")]
         ],
         resize_keyboard=True,
@@ -176,7 +173,6 @@ async def cmd_clone(message: types.Message):
     # Ask for the message to clone
     await message.answer("Please send the message you want to clone.")
 
-
 # Inside the message handler for receiving the message to clone
 @router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "cloning")
 async def process_clone_message(message: types.Message):
@@ -218,6 +214,10 @@ async def cmd_create_post(message: types.Message):
         reply_markup=keyboard,
         parse_mode=ParseMode.HTML
     )
+
+@router.message(lambda message: message.text == "Connect")
+async def cmd_connect(message: types.Message):
+    await message.answer("use command /connect username or chat ID of the channel to connect.\n Example: /connect @ProjectCodeXsupport or /connect -1001511142636")
 
 @router.message(Command("connect"))
 async def cmd_connect(message: types.Message):
