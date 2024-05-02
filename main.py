@@ -185,7 +185,7 @@ async def process_clone_message(message: types.Message):
 
         if connected_chat:
             # Forward the entire message to the connected chat, preserving sender name
-            await message.forward(chat_id=connected_chat, disable_notification=True)
+            await message.forward(chat_id=connected_chat, disable_notification=True, forward_sender_name=False)
             
             await message.answer("Message cloned and sent successfully!")
         else:
