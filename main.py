@@ -201,7 +201,7 @@ async def callback_forward_post_cancel(query: types.CallbackQuery):
             connected_chat = user_info.get("connected_chat")
 
             if connected_chat:
-                # Forward the message to the connected chat
+                # Forward the entire message to the connected chat
                 try:
                     await query.bot.forward_message(chat_id=connected_chat, from_chat_id=query.message.chat.id, message_id=forwarded_message_id)
                     await query.answer("Message forwarded successfully!")
