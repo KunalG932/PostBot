@@ -172,21 +172,21 @@ async def cmd_forward_input(message: types.Message):
     # Prompt the user to forward the message they want to send to the connected chat
     await message.answer("Please forward the message you want to send to the connected chat.")
 
-@router.message(lambda message: message.from_user.id in user_input_dict and user_input_dict[message.from_user.id] == "")
+@router.message(lambda message: message.text == "" and message.from_user.id in user_input_dict)
 async def process_forward_input(message: types.Message):
-    # Retrieve the message ID from the forwarded message
-    forwarded_message_id = message.message_id
-    
-    # Store the forwarded message ID in the dictionary using the user's ID as the key
-    user_input_dict[message.from_user.id] = forwarded_message_id
+    if message.forward_from is not None:  # Check if message is forwarded
+        forwarded_message_id = message.forward_from_message_id
+        user_input_dict[message.from_user.id] = forwarded_message_id
 
-    # Provide a keyboard with "FORWARD" and "CANCEL" buttons
-    keyboard = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="📬 FORWARD"), KeyboardButton(text="🚫 CANCEL")]],
-        resize_keyboard=True,
-    )
+        # Provide a keyboard with "FORWARD" and "CANCEL" buttons
+        keyboard = ReplyKeyboardMarkup(
+            keyboard=[[KeyboardButton(text="📬 FORWARD"), KeyboardButton(text="🚫 CANCEL")]],
+            resize_keyboard=True,
+        )
 
-    await message.answer("Message saved! Click the '📬 FORWARD' button to forward it to the connected chat or click '🚫 CANCEL' to cancel.", reply_markup=keyboard)
+        await message.answer("Message saved! Click the '📬 FORWARD' button to forward it to the connected chat or click '🚫 CANCEL' to cancel.", reply_markup=keyboard)
+    else:
+        await message.answer("No forwarded message found. Please forward a message first.")
 
 @router.message(lambda message: message.text == "📬 FORWARD")
 async def process_forward_message(message: types.Message):
@@ -213,7 +213,7 @@ async def process_forward_message(message: types.Message):
     # Remove the user's ID from the dictionary
     del user_input_dict[message.from_user.id]
 
-      # Optionally, you can provide a response for the "CANCEL" action
+    # Optionally, you can provide a response for the "CANCEL" action
     if message.text == "🚫 CANCEL":
         await message.answer("Post canceled!")
         # Remove the user's ID from the dictionary
