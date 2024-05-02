@@ -168,15 +168,10 @@ async def cmd_post_cancel(message: types.Message):
 
 @router.message(lambda message: message.text == "Forward")
 async def cmd_forward_input(message: types.Message):
-    # Provide a keyboard with "FORWARD" and "CANCEL" buttons
-    keyboard = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="↗️ FORWARD"), KeyboardButton(text="🚫 CANCEL")]],
-        resize_keyboard=True,
-    )
+    # Prompt the user to forward the current message
+    await message.answer("Please forward the message you want to send to the connected chat.")
 
-    await message.answer("Click the '↗️ FORWARD' button to forward this message to the connected chat or click '🚫 CANCEL' to cancel.", reply_markup=keyboard)
-
-@router.message(lambda message: message.text == "↗️ FORWARD")
+@router.message(content_types=types.ContentType.ANY, func=lambda message: message.forward_from_chat is not None)
 async def process_forward_input(message: types.Message):
     # Retrieve the connected chat ID from the user's information
     user_info = await db.users.find_one({"user_id": message.from_user.id})
