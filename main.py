@@ -215,7 +215,7 @@ async def callback_forward_post_cancel(message: types.Message):
         del user_input_dict[message.from_user.id]
 
 # Add a message handler to process any message selection for forwarding
-@router.message(content_types=ContentType.ANY)
+@router.message(ContentType.ANY)
 async def process_message_for_forwarding(message: types.Message):
     # Store the message ID in the user input dictionary
     user_input_dict[message.from_user.id] = message.message_id
