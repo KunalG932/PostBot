@@ -210,7 +210,7 @@ async def process_clone_message(message: types.Message):
             connected_chat = user_info.get("connected_chat")
 
             if connected_chat:
-                # Clone the message
+                # Clone the message including inline buttons
                 cloned_message = await message.copy_to(chat_id=connected_chat, reply_markup=message.reply_markup)
                 await message.answer("Message cloned and sent successfully!")
             else:
@@ -225,7 +225,7 @@ async def process_clone_message(message: types.Message):
 
             if connected_chat:
                 # Forward the entire message to the connected chat
-                await message.forward(chat_id=connected_chat, reply_markup=message.reply_markup)
+                await message.forward(chat_id=connected_chat)
                 await message.answer("Message forwarded successfully!")
             else:
                 await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
@@ -237,11 +237,8 @@ async def process_clone_message(message: types.Message):
 
 @router.message(lambda message: message.text == "🌟 Create Post 🌟")
 async def cmd_create_post(message: types.Message):
-    # Keep track of the previous state if necessary
-    prev_state = user_input_dict.get(message.from_user.id, {}).get("state")
-
     # Reset the state for the user
-    user_input_dict[message.from_user.id] = {"state": "main_menu"}
+    user_input_dict[message.from_user.id] = {"state": "main_menu", "cloning": False}
 
     # Create a custom keyboard with options
     keyboard = ReplyKeyboardMarkup(
