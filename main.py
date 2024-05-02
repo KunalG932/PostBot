@@ -62,8 +62,12 @@ async def cmd_create_post(message: types.Message):
         reply_markup=keyboard,
     )
 
+# Inside the message handler for the "Back" button
 @router.message(lambda message: message.text == "🔙 Back")
 async def cmd_back(message: types.Message):
+    # Reset the state for the user to cancel the cloning process
+    user_input_dict.get(message.from_user.id, {})["state"] = "main_menu"
+
     # Re-send the original keyboard after returning
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
