@@ -180,7 +180,7 @@ async def process_forwarded_message(message: types.Message):
     # Provide keyboard buttons for posting or canceling
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="📬 FORWARD"), KeyboardButton(text="🚫 CANCEL")]
+            [KeyboardButton(text="📬 FORWARD"), KeyboardButton(text="🚫 Cancel")]
         ],
         resize_keyboard=True,
     )
@@ -188,10 +188,11 @@ async def process_forwarded_message(message: types.Message):
     await message.answer("Message saved! Click the '📬 FORWARD' button to forward it to the connected chat or click '🚫 Cancel' to cancel.", reply_markup=keyboard)
 
 # Modify the callback handler to process button clicks for forwarding
-@router.message(lambda message: message.text in ["📬 FORWARD", "🚫 CANCEL"])
+# Modify the callback handler to process button clicks for forwarding
+@router.message(lambda message: message.text in ["📬 FORWARD", "🚫 Cancel"])
 async def callback_forward_post_cancel(message: types.Message):
     # Retrieve the saved forwarded message ID from the dictionary using the user's ID as the key
-    forwarded_message_id = user_input_dict.get(message.from_user.id, "")
+    forwarded_message_id = user_input_dict.get(message.from_user.id)
 
     if message.text == "📬 FORWARD":
         if forwarded_message_id:
@@ -211,13 +212,13 @@ async def callback_forward_post_cancel(message: types.Message):
         else:
             await message.answer("No message found. Please select a message to forward first.")
 
-        # Remove the user's ID from the dictionary
+    elif message.text == "🚫 Cancel":
+        await message.answer("Forward canceled!")
+
+    # Remove the user's ID from the dictionary if it exists
+    if message.from_user.id in user_input_dict:
         del user_input_dict[message.from_user.id]
 
-    elif message.text == "🚫 CANCEL":
-        await message.answer("Forward canceled!")
-        # Remove the user's ID from the dictionary
-        del user_input_dict[message.from_user.id]
 
 @router.message(lambda message: message.text == "Connect")
 async def cmd_connect(message: types.Message):
