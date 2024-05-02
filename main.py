@@ -14,6 +14,7 @@ from constants import *
 from db import *
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
+from aiogram.enums import ContentType
 
 user_input_dict = {}
 
@@ -165,13 +166,13 @@ async def cmd_post_cancel(message: types.Message):
 
     await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
 
-# Add a handler for processing the "Forward" inline button click
 # Modify the message handler for the "Forward" button
 @router.message(lambda message: message.text == "Forward")
 async def cmd_forward_input(message: types.Message):
     # Ask the user to select a message to forward
     await message.answer("Please select a message to forward to the connected chat.")
 
+# Modify the callback handler to process button clicks for forwarding
 # Modify the callback handler to process button clicks for forwarding
 @router.message(lambda message: message.text in ["📬 Post", "🚫 Cancel"])
 async def callback_forward_post_cancel(message: types.Message):
@@ -186,8 +187,18 @@ async def callback_forward_post_cancel(message: types.Message):
 
             if connected_chat:
                 try:
-                    # Forward the selected message to the connected chat with the name of the forwarder included
-                    await message.bot.forward_message(chat_id=connected_chat, from_chat_id=message.chat.id, message_id=forwarded_message_id)
+                    # Retrieve the original message
+                    original_message = await message.bot.get_message(chat_id=message.chat.id, message_id=forwarded_message_id)
+                    
+                    # Modify the sender's name to include "Forwarded from @postgetbot"
+                    sender_name = f"Forwarded from @postgetbot {original_message.sender.first_name}"
+
+                    # Construct the new message text with the modified sender's name
+                    new_text = f"{sender_name}:\n{original_message.text}"
+                    
+                    # Forward the modified message to the connected chat
+                    await message.bot.send_message(chat_id=connected_chat, text=new_text)
+                    
                     await message.answer("Message forwarded successfully!")
                 except Exception as e:
                     await message.answer(f"Error forwarding message: {e}")
@@ -204,7 +215,7 @@ async def callback_forward_post_cancel(message: types.Message):
         del user_input_dict[message.from_user.id]
 
 # Add a message handler to process any message selection for forwarding
-@router.message(content_types=types.ContentType.ANY)
+@router.message(content_types=ContentType.ANY)
 async def process_message_for_forwarding(message: types.Message):
     # Store the message ID in the user input dictionary
     user_input_dict[message.from_user.id] = message.message_id
