@@ -176,6 +176,7 @@ async def cmd_clone(message: types.Message):
     await message.answer("Please send the message you want to clone.")
 
 # Inside the message handler for receiving the message to clone
+# Inside the message handler for receiving the message to clone
 @router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "cloning")
 async def process_clone_message(message: types.Message):
     try:
@@ -184,23 +185,8 @@ async def process_clone_message(message: types.Message):
         connected_chat = user_info.get("connected_chat")
 
         if connected_chat:
-            # Clone the message with premium emojis
-            # Retrieve the text and emoji from the original message
-            original_text = message.text
-            original_entities = message.entities
-            original_emoji = None
-            
-            # Find the emoji entity
-            for entity in original_entities:
-                if entity.type == "emoji":
-                    original_emoji = entity.text
-                    break
-            
-            if original_emoji:
-                # Send the emoji using send_dice method
-                await message.bot.send_dice(chat_id=connected_chat, emoji=original_emoji)
-            # Send the text separately
-            await message.bot.send_message(chat_id=connected_chat, text=original_text)
+            # Forward the entire message to the connected chat
+            await message.forward(chat_id=connected_chat)
             
             await message.answer("Message cloned and sent successfully!")
         else:
