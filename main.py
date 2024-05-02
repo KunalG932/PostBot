@@ -166,34 +166,13 @@ async def cmd_post_cancel(message: types.Message):
 
 @router.message(lambda message: message.text == "Forward")
 async def cmd_forward_input(message: types.Message):
-    # Store the user's ID as the key and initialize an empty string as the value
-    user_input_dict[message.from_user.id] = ""
-    
-    # Prompt the user to forward the message they want to send to the connected chat
+    # Prompt the user to forward the current message
     await message.answer("Please forward the message you want to send to the connected chat.")
 
-@router.message(lambda message: message.text == "" and message.from_user.id in user_input_dict)
+@router.message()
 async def process_forward_input(message: types.Message):
-    if message.forward_from is not None:  # Check if message is forwarded
-        forwarded_message_id = message.forward_from_message_id
-        user_input_dict[message.from_user.id] = forwarded_message_id
-
-        # Provide a keyboard with "FORWARD" and "CANCEL" buttons
-        keyboard = ReplyKeyboardMarkup(
-            keyboard=[[KeyboardButton(text="📬 FORWARD"), KeyboardButton(text="🚫 CANCEL")]],
-            resize_keyboard=True,
-        )
-
-        await message.answer("Message saved! Click the '📬 FORWARD' button to forward it to the connected chat or click '🚫 CANCEL' to cancel.", reply_markup=keyboard)
-    else:
-        await message.answer("No forwarded message found. Please forward a message first.")
-
-@router.message(lambda message: message.text == "📬 FORWARD")
-async def process_forward_message(message: types.Message):
-    # Retrieve the saved forwarded message ID from the dictionary using the user's ID as the key
-    forwarded_message_id = user_input_dict.get(message.from_user.id)
-
-    if forwarded_message_id:
+    # Check if the message is a forwarded message
+    if message.forward_from_chat:
         # Retrieve the connected chat ID from the user's information
         user_info = await db.users.find_one({"user_id": message.from_user.id})
         connected_chat = user_info.get("connected_chat")
@@ -201,34 +180,27 @@ async def process_forward_message(message: types.Message):
         if connected_chat:
             # Forward the message to the connected chat
             try:
-                await message.bot.forward_message(chat_id=connected_chat, from_chat_id=message.chat.id, message_id=forwarded_message_id)
+                await message.forward(chat_id=connected_chat)
                 await message.answer("Message forwarded successfully!")
             except Exception as e:
                 await message.answer(f"Error forwarding message: {e}")
         else:
             await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
+
+        # Go back to the "🌟 Create Post 🌟" menu
+        keyboard = ReplyKeyboardMarkup(
+            keyboard=[
+                [KeyboardButton(text="🌟 Create Post 🌟")],
+                [KeyboardButton(text="Chat")]
+            ],
+            resize_keyboard=True,
+        )
+
+        await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
     else:
-        await message.answer("No message found. Please forward a message first.")
+        # If it's not a forwarded message, prompt the user to forward a message
+        await message.answer("Please forward the message you want to send to the connected chat.")
 
-    # Remove the user's ID from the dictionary
-    del user_input_dict[message.from_user.id]
-
-    # Optionally, you can provide a response for the "CANCEL" action
-    if message.text == "🚫 CANCEL":
-        await message.answer("Post canceled!")
-        # Remove the user's ID from the dictionary
-        del user_input_dict[message.from_user.id]
-
-    # Go back to the "🌟 Create Post 🌟" menu
-    keyboard = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="🌟 Create Post 🌟")],
-            [KeyboardButton(text="Chat")]
-        ],
-        resize_keyboard=True,
-    )
-
-    await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
 
 @router.message(lambda message: message.text == "Connect")
 async def cmd_connect(message: types.Message):
