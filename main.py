@@ -172,36 +172,48 @@ async def cmd_forward_input(message: types.Message):
     # Prompt the user to forward the message they want to send to the connected chat
     await message.answer("Please forward the message you want to send to the connected chat.")
 
-@router.message(lambda message: message.text in ["📬 FORWARD", "🚫 CANCEL"])
-async def cmd_forward_cancel(message: types.Message):
+@router.message(lambda message: message.text == "📬 FORWARD")
+async def process_forward_input(message: types.Message):
     # Retrieve the saved message from the dictionary using the user's ID as the key
     forward_message = user_input_dict.get(message.from_user.id, "")
 
-    if message.text == "📬 FORWARD":
-        if forward_message:
-            # Retrieve the connected chat ID from the user's information
-            user_info = await db.users.find_one({"user_id": message.from_user.id})
-            connected_chat = user_info.get("connected_chat")
+    if forward_message:
+        # Retrieve the connected chat ID from the user's information
+        user_info = await db.users.find_one({"user_id": message.from_user.id})
+        connected_chat = user_info.get("connected_chat")
 
-            if connected_chat:
-                # Forward the message to the connected chat
-                try:
-                    await message.forward(chat_id=connected_chat)
-                    await message.answer("Message forwarded successfully!")
-                except Exception as e:
-                    await message.answer(f"Error forwarding message: {e}")
-            else:
-                await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
+        if connected_chat:
+            # Forward the message to the connected chat
+            try:
+                await message.forward(chat_id=connected_chat)
+                await message.answer("Message forwarded successfully!")
+            except Exception as e:
+                await message.answer(f"Error forwarding message: {e}")
         else:
-            await message.answer("No message found. Please forward a message first.")
+            await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
+    else:
+        await message.answer("No message found. Please forward a message first.")
 
-        # Remove the user's ID from the dictionary
-        del user_input_dict[message.from_user.id]
+    # Remove the user's ID from the dictionary
+    del user_input_dict[message.from_user.id]
 
-    if message.text == "🚫 CANCEL":
-        await message.answer("Forward canceled!")
-        # Remove the user's ID from the dictionary
-        del user_input_dict[message.from_user.id]
+    # Go back to the "🌟 Create Post 🌟" menu
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🌟 Create Post 🌟")],
+            [KeyboardButton(text="Chat")]
+        ],
+        resize_keyboard=True,
+    )
+
+    await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
+
+@router.message(lambda message: message.text == "🚫 CANCEL")
+async def cmd_forward_cancel(message: types.Message):
+    await message.answer("Forward canceled!")
+
+    # Remove the user's ID from the dictionary
+    del user_input_dict[message.from_user.id]
 
     # Go back to the "🌟 Create Post 🌟" menu
     keyboard = ReplyKeyboardMarkup(
