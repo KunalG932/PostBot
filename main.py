@@ -167,15 +167,12 @@ async def cmd_post_cancel(message: types.Message):
 # Add a handler for processing the "Forward" inline button click
 @router.message(lambda message: message.text == "Forward")
 async def cmd_forward_input(message: types.Message):
-    # Ask for the message to forward
-    await message.answer("Please provide the message to forward to the connected chat.")
-
-    # Store the user's ID as the key and initialize an empty string as the value
-    user_input_dict[message.from_user.id] = ""
+    # Ask the user to select a message to forward
+    await message.answer("Please select a message to forward to the connected chat.")
 
 # Add a message handler to process the forwarded message
-@router.message(lambda message: message.from_user.id in user_input_dict and user_input_dict[message.from_user.id] == "")
-async def process_forward_input(message: types.Message):
+@router.message(lambda message: message.forward_from_chat is not None)
+async def process_forwarded_message(message: types.Message):
     # Store the forwarded message ID in the user input dictionary
     user_input_dict[message.from_user.id] = message.message_id
 
@@ -203,14 +200,14 @@ async def callback_forward_post_cancel(query: types.CallbackQuery):
             if connected_chat:
                 # Forward the entire message to the connected chat
                 try:
-                    await query.bot.forward_message(chat_id=connected_chat, from_chat_id=query.message.chat.id, message_id=forwarded_message_id)
+                    await query.bot.forward_message(chat_id=connected_chat, from_chat_id=query.message.forward_from_chat.id, message_id=forwarded_message_id)
                     await query.answer("Message forwarded successfully!")
                 except Exception as e:
                     await query.answer(f"Error forwarding message: {e}")
             else:
                 await query.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
         else:
-            await query.answer("No message found. Please provide a message to forward first.")
+            await query.answer("No message found. Please select a message to forward first.")
 
         # Remove the user's ID from the dictionary
         del user_input_dict[query.from_user.id]
