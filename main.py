@@ -17,7 +17,7 @@ from aiogram.types.sticker import Sticker
 from aiogram.types.reaction_type_custom_emoji import ReactionTypeCustomEmoji
 
 user_input_dict = {}
-BOT_USERNAME = PostGetBot
+BOT_USERNAME = "PostGetBot"
 
 # Set the event loop policy to uvloop
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
