@@ -212,7 +212,7 @@ async def process_clone_message(message: types.Message):
 
             if connected_chat:
                 # Clone the message
-                cloned_message = await message.copy_to(chat_id=connected_chat)
+                cloned_message = await message.copy_to(chat_id=connected_chat, reply_markup=message.reply_markup)
                 await message.answer("Message cloned and sent successfully!")
             else:
                 await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
@@ -226,7 +226,7 @@ async def process_clone_message(message: types.Message):
 
             if connected_chat:
                 # Forward the entire message to the connected chat
-                await message.forward(chat_id=connected_chat)
+                await message.forward(chat_id=connected_chat, reply_markup=message.reply_markup)
                 await message.answer("Message forwarded successfully!")
             else:
                 await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
