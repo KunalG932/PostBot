@@ -166,70 +166,66 @@ async def cmd_post_cancel(message: types.Message):
 
     await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
 
-# Modify the message handler for the "Forward" button
 @router.message(lambda message: message.text == "Forward")
-async def cmd_forward_input(message: types.Message):
-    # Ask the user to select a message to forward
-    await message.answer("Please select a message to forward to the connected chat.")
+async def cmd_forward(message: types.Message):
+    # Ask for the message to forward
+    await message.answer("Please provide the message you want to forward.")
 
-# Modify the callback handler to process button clicks for forwarding
-# Modify the callback handler to process button clicks for forwarding
-@router.message(lambda message: message.text in ["📬 Post", "🚫 Cancel"])
-async def callback_forward_post_cancel(message: types.Message):
-    # Retrieve the saved forwarded message ID from the dictionary using the user's ID as the key
-    forwarded_message_id = user_input_dict.get(message.from_user.id)
+    # Update the user's state to indicate they are forwarding a message
+    await ForwardingState.start.set()
 
-    if message.text == "📬 Post":
-        if forwarded_message_id:
-            # Retrieve the connected chat ID from the user's information
-            user_info = await db.users.find_one({"user_id": message.from_user.id})
-            connected_chat = user_info.get("connected_chat")
+@router.message(state=ForwardingState.start)
+async def process_forwarding(message: types.Message, state: FSMContext):
+    # Retrieve the forwarded message
+    forwarded_message = message.text
 
-            if connected_chat:
-                try:
-                    # Retrieve the original message
-                    original_message = await message.bot.get_message(chat_id=message.chat.id, message_id=forwarded_message_id)
-                    
-                    # Modify the sender's name to include "Forwarded from @postgetbot"
-                    sender_name = f"Forwarded from @postgetbot {original_message.sender.first_name}"
+    # Provide keyboard options for forwarding or canceling
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="📤 Forward"), KeyboardButton(text="🚫 Cancel")]],
+        resize_keyboard=True,
+    )
 
-                    # Construct the new message text with the modified sender's name
-                    new_text = f"{sender_name}:\n{original_message.text}"
-                    
-                    # Forward the modified message to the connected chat
-                    await message.bot.send_message(chat_id=connected_chat, text=new_text)
-                    
-                    await message.answer("Message forwarded successfully!")
-                except Exception as e:
-                    await message.answer(f"Error forwarding message: {e}")
-            else:
-                await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
+    await message.answer("Message received! Click the '📤 Forward' button to forward it to the connected chat or click '🚫 Cancel' to cancel.", reply_markup=keyboard)
+
+    # Store the forwarded message in the user's state
+    await state.update_data(forwarded_message=forwarded_message)
+
+@router.message(lambda message: message.text in ["📤 Forward", "🚫 Cancel"], state=ForwardingState.start)
+async def cmd_forward_cancel(message: types.Message, state: FSMContext):
+    # Retrieve the user's state data
+    async with state.proxy() as data:
+        forwarded_message = data.get("forwarded_message", "")
+
+    if message.text == "📤 Forward":
+        # Retrieve the connected chat ID from the user's information
+        user_info = await db.users.find_one({"user_id": message.from_user.id})
+        connected_chat = user_info.get("connected_chat")
+
+        if connected_chat:
+            # Forward the message to the connected chat
+            try:
+                await message.bot.send_message(chat_id=connected_chat, text=forwarded_message)
+                await message.answer("Message forwarded successfully!")
+            except Exception as e:
+                await message.answer(f"Error forwarding message: {e}")
         else:
-            await message.answer("No message found. Please select a message to forward first.")
-
+            await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
     elif message.text == "🚫 Cancel":
-        await message.answer("Forward canceled!")
+        await message.answer("Forwarding canceled!")
 
-    # Remove the user's ID from the dictionary if it exists
-    if message.from_user.id in user_input_dict:
-        del user_input_dict[message.from_user.id]
+    # Reset the user's state
+    await state.finish()
 
-# Add a message handler to process any message selection for forwarding
-@router.message(ContentType.ANY)
-async def process_message_for_forwarding(message: types.Message):
-    # Store the message ID in the user input dictionary
-    user_input_dict[message.from_user.id] = message.message_id
-
-    # Provide keyboard buttons for posting or canceling
+    # Go back to the "🌟 Create Post 🌟" menu
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="📬 Post"), KeyboardButton(text="🚫 Cancel")]
+            [KeyboardButton(text="🌟 Create Post 🌟")],
+            [KeyboardButton(text="Chat")]
         ],
         resize_keyboard=True,
     )
 
-    await message.answer("Message saved! Click the '📬 Post' button to forward it to the connected chat or click '🚫 Cancel' to cancel.", reply_markup=keyboard)
-
+    await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
 
 @router.message(lambda message: message.text == "Connect")
 async def cmd_connect(message: types.Message):
