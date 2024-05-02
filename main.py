@@ -167,6 +167,36 @@ async def cmd_post_cancel(message: types.Message):
 
     await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
 
+# Inside the message handler for the "Clone" button
+@router.message(lambda message: message.text == "Clone")
+async def cmd_clone(message: types.Message):
+    # Set the cloning state for the user
+    user_input_dict.setdefault(message.from_user.id, {})["state"] = "cloning"
+
+    # Ask for the message to clone
+    await message.answer("Please send the message you want to clone.")
+
+
+# Inside the message handler for receiving the message to clone
+@router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "cloning")
+async def process_clone_message(message: types.Message):
+    try:
+        # Retrieve the connected chat from the user's information
+        user_info = await db.users.find_one({"user_id": message.from_user.id})
+        connected_chat = user_info.get("connected_chat")
+
+        if connected_chat:
+            # Clone the message with reply markup (including inline buttons)
+            cloned_message = await message.copy_to(chat_id=connected_chat, reply_markup=message.reply_markup)
+            await message.answer("Message cloned and sent successfully!")
+        else:
+            await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
+    except Exception as e:
+        await message.answer(f"Error cloning message: {e}")
+
+    # Reset the state for the user
+    user_input_dict.get(message.from_user.id, {})["state"] = "main_menu"
+
 @router.message(lambda message: message.text == "🌟 Create Post 🌟")
 async def cmd_create_post(message: types.Message):
     # Reset the state for the user
@@ -188,50 +218,6 @@ async def cmd_create_post(message: types.Message):
         reply_markup=keyboard,
         parse_mode=ParseMode.HTML
     )
-
-
-# Inside the message handler for the "Clone" button
-@router.message(lambda message: message.text == "Clone")
-async def cmd_clone(message: types.Message):
-    # Set the cloning state for the user
-    user_input_dict.setdefault(message.from_user.id, {})["state"] = "cloning"
-
-    # Ask for the message to clone
-    await message.answer("Please send the message you want to clone.")
-
-
-# Inside the message handler for receiving the message to clone
-@router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "cloning")
-async def process_clone_message(message: types.Message):
-    # Retrieve the connected chat from the user's information
-    user_info = await db.users.find_one({"user_id": message.from_user.id})
-    connected_chat = user_info.get("connected_chat")
-
-    if connected_chat:
-        try:
-            # Create a new message content by combining the original message text with the URL buttons
-            new_message_content = message.text + "\n"  # Add the original message text
-
-            # Iterate through the entities of the original message to find URL buttons
-            for entity in message.entities:
-                if entity.type == "text_link":
-                    # Extract URL and button text from the entity
-                    url = message.text[entity.offset:entity.offset + entity.length]
-                    button_text = message.text[entity.offset:entity.offset + entity.length]
-
-                    # Add the URL button to the new message content
-                    new_message_content += f'<a href="{url}">{button_text}</a>\n'
-
-            # Send the new message content to the connected chat
-            await message.bot.send_message(chat_id=connected_chat, text=new_message_content)
-            await message.answer("Message cloned and sent successfully!")
-        except Exception as e:
-            await message.answer(f"Error cloning message: {e}")
-    else:
-        await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
-
-    # Reset the state for the user
-    user_input_dict[message.from_user.id]["state"] = "main_menu"
 
 @router.message(Command("connect"))
 async def cmd_connect(message: types.Message):
