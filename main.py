@@ -194,7 +194,7 @@ async def cmd_create_post(message: types.Message):
 @router.message(lambda message: message.text == "Clone")
 async def cmd_clone(message: types.Message):
     # Set the cloning state for the user
-    user_input_dict[message.from_user.id]["state"] = "cloning"
+    user_input_dict.setdefault(message.from_user.id, {})["state"] = "cloning"
 
     # Ask for the message to clone
     await message.answer("Please send the message you want to clone.")
