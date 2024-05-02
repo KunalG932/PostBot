@@ -169,7 +169,7 @@ async def cmd_forward_input(message: types.Message):
     # Prompt the user to forward the current message
     await message.answer("Please forward the message you want to send to the connected chat.")
 
-@router.message()
+@router.message(lambda message: message.from_user.id in user_input_dict and user_input_dict[message.from_user.id] == "Forward")
 async def process_forward_input(message: types.Message):
     # Check if the message is a forwarded message
     if message.forward_from_chat:
@@ -200,7 +200,6 @@ async def process_forward_input(message: types.Message):
     else:
         # If it's not a forwarded message, prompt the user to forward a message
         await message.answer("Please forward the message you want to send to the connected chat.")
-
 
 @router.message(lambda message: message.text == "Connect")
 async def cmd_connect(message: types.Message):
