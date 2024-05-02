@@ -184,21 +184,6 @@ async def cmd_clone(message: types.Message):
     # Ask for the type of clone
     await message.answer("Choose the type of clone:", reply_markup=keyboard)
 
-@router.message(lambda message: message.text in ["Normal Clone", "Forward Clone"])
-async def process_clone_type(message: types.Message):
-    clone_type = message.text
-
-    if clone_type == "Normal Clone":
-        await message.answer("Please send the message you want to clone.")
-
-        # Set the state for normal cloning
-        user_input_dict.setdefault(message.from_user.id, {})["clone_type"] = "normal"
-    elif clone_type == "Forward Clone":
-        await message.answer("Please send the message you want to forward.")
-
-        # Set the state for forward cloning
-        user_input_dict.setdefault(message.from_user.id, {})["clone_type"] = "forward"
-
 @router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "cloning")
 async def process_clone_message(message: types.Message):
     clone_type = user_input_dict.get(message.from_user.id, {}).get("clone_type")
@@ -210,8 +195,16 @@ async def process_clone_message(message: types.Message):
             connected_chat = user_info.get("connected_chat")
 
             if connected_chat:
-                # Clone the message including inline buttons
-                cloned_message = await message.copy_to(chat_id=connected_chat, reply_markup=message.reply_markup)
+                # Extract inline buttons from the original message
+                inline_buttons = None
+                if message.reply_markup and isinstance(message.reply_markup, types.InlineKeyboardMarkup):
+                    inline_buttons = message.reply_markup.inline_keyboard
+
+                # Clone the message and include inline buttons
+                cloned_message = await message.copy_to(chat_id=connected_chat)
+                if inline_buttons:
+                    await cloned_message.reply(text='', reply_markup=types.InlineKeyboardMarkup(inline_keyboard=inline_buttons))
+                    
                 await message.answer("Message cloned and sent successfully!")
             else:
                 await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
