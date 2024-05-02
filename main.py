@@ -17,6 +17,7 @@ from aiogram.types.sticker import Sticker
 from aiogram.types.reaction_type_custom_emoji import ReactionTypeCustomEmoji
 
 user_input_dict = {}
+BOT_USERNAME = PostGetBot
 
 # Set the event loop policy to uvloop
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
@@ -185,8 +186,11 @@ async def process_clone_message(message: types.Message):
         connected_chat = user_info.get("connected_chat")
 
         if connected_chat:
-            # Forward the entire message to the connected chat, changing sender name to bot's username
-            await message.forward(chat_id=connected_chat, from_chat_id="@PostGetBot", disable_notification=True)
+            # Create a new message with the sender's name set to the bot's username
+            cloned_message_text = f"Forwarded from @{BOT_USERNAME}:\n\n{message.text}"
+            
+            # Forward the new message to the connected chat
+            await message.bot.send_message(chat_id=connected_chat, text=cloned_message_text)
             
             await message.answer("Message cloned and sent successfully!")
         else:
