@@ -13,8 +13,6 @@ from constants import *
 from db import *
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
-from aiogram.types.sticker import Sticker
-from aiogram.types.reaction_type_custom_emoji import ReactionTypeCustomEmoji
 
 user_input_dict = {}
 
@@ -167,12 +165,10 @@ async def cmd_post_cancel(message: types.Message):
     await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
 
 # Inside the message handler for the "Clone" button
+# Inside the message handler for the "Clone" button
 @router.message(lambda message: message.text == "Clone")
 async def cmd_clone(message: types.Message):
-    # Set the cloning state for the user
-    user_input_dict.setdefault(message.from_user.id, {})["state"] = "cloning"
-
-    # Create a custom keyboard with options for normal clone and forward clone
+    # Create a keyboard with options: "Normal Clone" and "Forward Clone"
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="Normal Clone"), KeyboardButton(text="Forward Clone")],
@@ -181,49 +177,69 @@ async def cmd_clone(message: types.Message):
         resize_keyboard=True,
     )
 
-    # Ask for the type of clone
-    await message.answer("Choose the type of clone:", reply_markup=keyboard)
+    await message.answer(
+        "Choose an option for cloning:",
+        reply_markup=keyboard,
+    )
 
-@router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "cloning")
-async def process_clone_message(message: types.Message):
-    clone_type = user_input_dict.get(message.from_user.id, {}).get("clone_type")
+# Inside the message handler for selecting "Normal Clone"
+@router.message(lambda message: message.text == "Normal Clone")
+async def cmd_normal_clone(message: types.Message):
+    # Set the cloning state for the user
+    user_input_dict.setdefault(message.from_user.id, {})["state"] = "normal_cloning"
 
-    if clone_type == "normal":
-        try:
-            # Retrieve the connected chat from the user's information
-            user_info = await db.users.find_one({"user_id": message.from_user.id})
-            connected_chat = user_info.get("connected_chat")
+    # Ask for the message to clone
+    await message.answer("Please send the message you want to clone.")
 
-            if connected_chat:
-                # Extract inline buttons from the original message
-                inline_buttons = None
-                if message.reply_markup and isinstance(message.reply_markup, types.InlineKeyboardMarkup):
-                    inline_buttons = message.reply_markup.inline_keyboard
+# Inside the message handler for selecting "Forward Clone"
+@router.message(lambda message: message.text == "Forward Clone")
+async def cmd_forward_clone(message: types.Message):
+    try:
+        # Set the cloning state for the user
+        user_input_dict.setdefault(message.from_user.id, {})["state"] = "forward_cloning"
 
-                # Clone the message and include inline buttons
-                cloned_message = await message.copy_to(chat_id=connected_chat)
-                if inline_buttons:
-                    await cloned_message.reply(text='', reply_markup=types.InlineKeyboardMarkup(inline_keyboard=inline_buttons))
-                    
-                await message.answer("Message cloned and sent successfully!")
-            else:
-                await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
-        except Exception as e:
-            await message.answer(f"Error cloning message: {e}")
-    elif clone_type == "forward":
-        try:
-            # Retrieve the connected chat from the user's information
-            user_info = await db.users.find_one({"user_id": message.from_user.id})
-            connected_chat = user_info.get("connected_chat")
+        # Send a message asking the user to provide the message they want to clone
+        await message.answer("Please send the message you want to clone.")
 
-            if connected_chat:
-                # Forward the entire message to the connected chat
-                await message.forward(chat_id=connected_chat)
-                await message.answer("Message forwarded successfully!")
-            else:
-                await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
-        except Exception as e:
-            await message.answer(f"Error forwarding message: {e}")
+    except Exception as e:
+        await message.answer(f"Error initiating forward clone: {e}")
+
+# Inside the message handler for receiving the message to clone (forward clone)
+@router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "forward_cloning")
+async def process_forward_clone_message(message: types.Message):
+    try:
+        # Retrieve the connected chat from the user's information
+        user_info = await db.users.find_one({"user_id": message.from_user.id})
+        connected_chat = user_info.get("connected_chat")
+
+        if connected_chat:
+            # Forward the entire message to the connected chat
+            await message.forward(chat_id=connected_chat)
+            await message.answer("Message forwarded successfully!")
+        else:
+            await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
+    except Exception as e:
+        await message.answer(f"Error forwarding message: {e}")
+
+    # Reset the state for the user
+    user_input_dict.get(message.from_user.id, {})["state"] = "main_menu"
+
+# Inside the message handler for receiving the message to clone
+@router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "normal_cloning")
+async def process_normal_clone_message(message: types.Message):
+    try:
+        # Retrieve the connected chat from the user's information
+        user_info = await db.users.find_one({"user_id": message.from_user.id})
+        connected_chat = user_info.get("connected_chat")
+
+        if connected_chat:
+            # Clone the message with reply markup (including inline buttons)
+            cloned_message = await message.copy_to(chat_id=connected_chat, reply_markup=message.reply_markup)
+            await message.answer("Message cloned and sent successfully!")
+        else:
+            await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
+    except Exception as e:
+        await message.answer(f"Error cloning message: {e}")
 
     # Reset the state for the user
     user_input_dict.get(message.from_user.id, {})["state"] = "main_menu"
