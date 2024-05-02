@@ -185,7 +185,7 @@ async def process_forwarded_message(message: types.Message):
         resize_keyboard=True,
     )
 
-    await message.answer("Message saved! Click the '📬 Post' button to forward it to the connected chat or click '🚫 Cancel' to cancel.", reply_markup=keyboard)
+    await message.answer("Message saved! Click the '📬 FORWARD' button to forward it to the connected chat or click '🚫 Cancel' to cancel.", reply_markup=keyboard)
 
 # Modify the callback handler to process button clicks for forwarding
 @router.message(lambda message: message.text in ["📬 FORWARD", "🚫 CANCEL"])
@@ -193,7 +193,7 @@ async def callback_forward_post_cancel(message: types.Message):
     # Retrieve the saved forwarded message ID from the dictionary using the user's ID as the key
     forwarded_message_id = user_input_dict.get(message.from_user.id)
 
-    if message.text == "📬 Post":
+    if message.text == "📬 FORWARD":
         if forwarded_message_id:
             # Retrieve the connected chat ID from the user's information
             user_info = await db.users.find_one({"user_id": message.from_user.id})
@@ -214,7 +214,7 @@ async def callback_forward_post_cancel(message: types.Message):
         # Remove the user's ID from the dictionary
         del user_input_dict[message.from_user.id]
 
-    elif message.text == "🚫 Cancel":
+    elif message.text == "🚫 CANCEL":
         await message.answer("Forward canceled!")
         # Remove the user's ID from the dictionary
         del user_input_dict[message.from_user.id]
