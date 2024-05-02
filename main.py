@@ -53,7 +53,7 @@ async def cmd_create_post(message: types.Message):
     # Create a new keyboard with options: Text, Media, Back
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="Text"), KeyboardButton(text="Forward"), KeyboardButton(text="Quote")],
+            [KeyboardButton(text="Text"), KeyboardButton(text="Clone"), KeyboardButton(text="Quote")],
             [KeyboardButton(text="🔙 Back")]
         ],
         resize_keyboard=True,
