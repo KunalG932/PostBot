@@ -176,7 +176,6 @@ async def cmd_clone(message: types.Message):
     await message.answer("Please send the message you want to clone.")
 
 # Inside the message handler for receiving the message to clone
-# Inside the message handler for receiving the message to clone
 @router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "cloning")
 async def process_clone_message(message: types.Message):
     try:
@@ -185,8 +184,8 @@ async def process_clone_message(message: types.Message):
         connected_chat = user_info.get("connected_chat")
 
         if connected_chat:
-            # Forward the entire message to the connected chat
-            await message.forward(chat_id=connected_chat)
+            # Forward the entire message to the connected chat, preserving sender name
+            await message.forward(chat_id=connected_chat, from_chat_id=message.chat.id, disable_notification=True)
             
             await message.answer("Message cloned and sent successfully!")
         else:
