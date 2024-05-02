@@ -13,6 +13,7 @@ from constants import *
 from db import *
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
+from aiogram.types.sticker import Sticker
 
 user_input_dict = {}
 
@@ -174,34 +175,30 @@ async def cmd_clone(message: types.Message):
     await message.answer("Please send the message you want to clone.")
 
 # Inside the message handler for receiving the message to clone
+# Inside the message handler for receiving the message to clone
 @router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "cloning")
 async def process_clone_message(message: types.Message):
-    try:
-        # Retrieve the connected chat from the user's information
-        user_info = await db.users.find_one({"user_id": message.from_user.id})
-        connected_chat = user_info.get("connected_chat")
+    # Retrieve the connected chat from the user's information
+    user_info = await db.users.find_one({"user_id": message.from_user.id})
+    connected_chat = user_info.get("connected_chat")
 
-        if connected_chat:
-            # Clone the message with reply markup (including inline buttons)
-            cloned_message = await message.copy_to(chat_id=connected_chat, reply_markup=message.reply_markup)
+    if connected_chat:
+        try:
+            # Clone the message exactly as it is
+            cloned_message = await message.copy_to(chat_id=connected_chat)
 
-            # Check if the original message contains a sticker
-            if message.sticker:
-                # Download the sticker file
-                sticker_file = await message.sticker.download()
-
-                # Send the sticker file as a new sticker in the cloned message
-                with open(sticker_file, "rb") as sticker:
-                    await cloned_message.reply_sticker(sticker)
+            # If the sticker has premium animation, clone it as well
+            if cloned_message.sticker and cloned_message.sticker.premium_animation:
+                await cloned_message.sticker.premium_animation.copy_to(chat_id=connected_chat)
 
             await message.answer("Message cloned and sent successfully!")
-        else:
-            await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
-    except Exception as e:
-        await message.answer(f"Error cloning message: {e}")
+        except Exception as e:
+            await message.answer(f"Error cloning message: {e}")
+    else:
+        await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
 
     # Reset the state for the user
-    user_input_dict.get(message.from_user.id, {})["state"] = "main_menu"
+    user_input_dict[message.from_user.id]["state"] = "main_menu"
 
 @router.message(lambda message: message.text == "🌟 Create Post 🌟")
 async def cmd_create_post(message: types.Message):
