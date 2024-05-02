@@ -166,44 +166,28 @@ async def cmd_post_cancel(message: types.Message):
     await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
 
 # Add a handler for processing the "Forward" inline button click
+# Modify the message handler for the "Forward" button
 @router.message(lambda message: message.text == "Forward")
 async def cmd_forward_input(message: types.Message):
     # Ask the user to select a message to forward
     await message.answer("Please select a message to forward to the connected chat.")
 
-# Add a message handler to process the forwarded message
-@router.message(lambda message: message.forward_from_chat is not None)
-async def process_forwarded_message(message: types.Message):
-    # Store the forwarded message ID in the user input dictionary
-    user_input_dict[message.from_user.id] = message.message_id
-
-    # Provide keyboard buttons for posting or canceling
-    keyboard = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="📬 FORWARD"), KeyboardButton(text="🚫 Cancel")]
-        ],
-        resize_keyboard=True,
-    )
-
-    await message.answer("Message saved! Click the '📬 FORWARD' button to forward it to the connected chat or click '🚫 Cancel' to cancel.", reply_markup=keyboard)
-
 # Modify the callback handler to process button clicks for forwarding
-# Modify the callback handler to process button clicks for forwarding
-@router.message(lambda message: message.text in ["📬 FORWARD", "🚫 Cancel"])
+@router.message(lambda message: message.text in ["📬 Post", "🚫 Cancel"])
 async def callback_forward_post_cancel(message: types.Message):
     # Retrieve the saved forwarded message ID from the dictionary using the user's ID as the key
     forwarded_message_id = user_input_dict.get(message.from_user.id)
 
-    if message.text == "📬 FORWARD":
+    if message.text == "📬 Post":
         if forwarded_message_id:
             # Retrieve the connected chat ID from the user's information
             user_info = await db.users.find_one({"user_id": message.from_user.id})
             connected_chat = user_info.get("connected_chat")
 
             if connected_chat:
-                # Forward the entire message to the connected chat
                 try:
-                    await message.bot.forward_message(chat_id=connected_chat, from_chat_id=message.forward_from_chat.id, message_id=forwarded_message_id)
+                    # Forward the selected message to the connected chat with the name of the forwarder included
+                    await message.bot.forward_message(chat_id=connected_chat, from_chat_id=message.chat.id, message_id=forwarded_message_id)
                     await message.answer("Message forwarded successfully!")
                 except Exception as e:
                     await message.answer(f"Error forwarding message: {e}")
@@ -218,6 +202,22 @@ async def callback_forward_post_cancel(message: types.Message):
     # Remove the user's ID from the dictionary if it exists
     if message.from_user.id in user_input_dict:
         del user_input_dict[message.from_user.id]
+
+# Add a message handler to process any message selection for forwarding
+@router.message(content_types=types.ContentType.ANY)
+async def process_message_for_forwarding(message: types.Message):
+    # Store the message ID in the user input dictionary
+    user_input_dict[message.from_user.id] = message.message_id
+
+    # Provide keyboard buttons for posting or canceling
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="📬 Post"), KeyboardButton(text="🚫 Cancel")]
+        ],
+        resize_keyboard=True,
+    )
+
+    await message.answer("Message saved! Click the '📬 Post' button to forward it to the connected chat or click '🚫 Cancel' to cancel.", reply_markup=keyboard)
 
 
 @router.message(lambda message: message.text == "Connect")
