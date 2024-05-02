@@ -9,12 +9,10 @@ from aiogram.filters import Command
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from constants import *
 from db import *
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
-from aiogram.enums.content_type import ContentType
 
 user_input_dict = {}
 
@@ -52,7 +50,7 @@ async def cmd_create_post(message: types.Message):
     # Create a new keyboard with options: Text, Media, Back
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="Text"), KeyboardButton(text="Forward"), KeyboardButton(text="Quote")],
+            [KeyboardButton(text="Text"), KeyboardButton(text="Media"), KeyboardButton(text="Quote")],
             [KeyboardButton(text="🔙 Back")]
         ],
         resize_keyboard=True,
@@ -168,44 +166,42 @@ async def cmd_post_cancel(message: types.Message):
 
 @router.message(lambda message: message.text == "Forward")
 async def cmd_forward_input(message: types.Message):
-    # Prompt the user to forward the current message
+    # Store the user's ID as the key and initialize an empty string as the value
+    user_input_dict[message.from_user.id] = ""
+    
+    # Prompt the user to forward the message they want to send to the connected chat
     await message.answer("Please forward the message you want to send to the connected chat.")
 
-@router.message()
-async def process_forward_input(message: types.Message):
-    # Check if the message is a forwarded message
-    if message.forward_from_chat:
-        # Retrieve the connected chat ID from the user's information
-        user_info = await db.users.find_one({"user_id": message.from_user.id})
-        connected_chat = user_info.get("connected_chat")
-
-        if connected_chat:
-            # Forward the message to the connected chat
-            try:
-                await message.forward(chat_id=connected_chat)
-                await message.answer("Message forwarded successfully!")
-            except Exception as e:
-                await message.answer(f"Error forwarding message: {e}")
-        else:
-            await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
-
-        # Go back to the "🌟 Create Post 🌟" menu
-        keyboard = ReplyKeyboardMarkup(
-            keyboard=[
-                [KeyboardButton(text="🌟 Create Post 🌟")],
-                [KeyboardButton(text="Chat")]
-            ],
-            resize_keyboard=True,
-        )
-
-        await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
-    else:
-        # If it's not a forwarded message, prompt the user to forward a message
-        await message.answer("Please forward the message you want to send to the connected chat.")
-
-@router.message(lambda message: message.text == "🚫 CANCEL")
+@router.message(lambda message: message.text in ["📬 FORWARD", "🚫 CANCEL"])
 async def cmd_forward_cancel(message: types.Message):
-    await message.answer("Forward canceled!")
+    # Retrieve the saved message from the dictionary using the user's ID as the key
+    forward_message = user_input_dict.get(message.from_user.id, "")
+
+    if message.text == "📬 FORWARD":
+        if forward_message:
+            # Retrieve the connected chat ID from the user's information
+            user_info = await db.users.find_one({"user_id": message.from_user.id})
+            connected_chat = user_info.get("connected_chat")
+
+            if connected_chat:
+                # Forward the message to the connected chat
+                try:
+                    await message.forward(chat_id=connected_chat)
+                    await message.answer("Message forwarded successfully!")
+                except Exception as e:
+                    await message.answer(f"Error forwarding message: {e}")
+            else:
+                await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
+        else:
+            await message.answer("No message found. Please forward a message first.")
+
+        # Remove the user's ID from the dictionary
+        del user_input_dict[message.from_user.id]
+
+    if message.text == "🚫 CANCEL":
+        await message.answer("Forward canceled!")
+        # Remove the user's ID from the dictionary
+        del user_input_dict[message.from_user.id]
 
     # Go back to the "🌟 Create Post 🌟" menu
     keyboard = ReplyKeyboardMarkup(
@@ -347,4 +343,3 @@ async def main() -> None:
 
 if __name__ == "__main__":
     asyncio.run(main())
-
