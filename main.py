@@ -21,9 +21,6 @@ user_input_dict = {}
 # Set the event loop policy to uvloop
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
-class ForwardingState(StatesGroup):
-    start = State()
-
 @router.message(Command("start"))
 async def cmd_start(message: types.Message):
     # Create a custom keyboard with only "Create Post" button
@@ -177,7 +174,7 @@ async def cmd_forward(message: types.Message):
     # Update the user's state to indicate they are forwarding a message
     await ForwardingState.start.set()
 
-@router.message(state=ForwardingState.start)
+@router.message(State=ForwardingState.start)
 async def process_forwarding(message: types.Message, state: FSMContext):
     # Retrieve the forwarded message
     forwarded_message = message.text
@@ -193,7 +190,7 @@ async def process_forwarding(message: types.Message, state: FSMContext):
     # Store the forwarded message in the user's state
     await state.update_data(forwarded_message=forwarded_message)
 
-@router.message(lambda message: message.text in ["📤 Forward", "🚫 Cancel"], state=ForwardingState.start)
+@router.message(lambda message: message.text in ["📤 Forward", "🚫 Cancel"], State=ForwardingState.start)
 async def cmd_forward_cancel(message: types.Message, state: FSMContext):
     # Retrieve the user's state data
     async with state.proxy() as data:
