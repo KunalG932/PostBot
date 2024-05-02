@@ -199,7 +199,6 @@ async def process_clone_type(message: types.Message):
         # Set the state for forward cloning
         user_input_dict.setdefault(message.from_user.id, {})["clone_type"] = "forward"
 
-
 @router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "cloning")
 async def process_clone_message(message: types.Message):
     clone_type = user_input_dict.get(message.from_user.id, {}).get("clone_type")
@@ -238,8 +237,11 @@ async def process_clone_message(message: types.Message):
 
 @router.message(lambda message: message.text == "🌟 Create Post 🌟")
 async def cmd_create_post(message: types.Message):
+    # Keep track of the previous state if necessary
+    prev_state = user_input_dict.get(message.from_user.id, {}).get("state")
+
     # Reset the state for the user
-    user_input_dict[message.from_user.id] = {"state": "main_menu", "cloning": False}
+    user_input_dict[message.from_user.id] = {"state": "main_menu"}
 
     # Create a custom keyboard with options
     keyboard = ReplyKeyboardMarkup(
