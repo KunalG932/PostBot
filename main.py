@@ -180,7 +180,7 @@ async def process_forwarded_message(message: types.Message):
     # Provide keyboard buttons for posting or canceling
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="📬 Forward"), KeyboardButton(text="🚫 Cancel")]
+            [KeyboardButton(text="📬 FORWARD"), KeyboardButton(text="🚫 CANCEL")]
         ],
         resize_keyboard=True,
     )
@@ -188,7 +188,7 @@ async def process_forwarded_message(message: types.Message):
     await message.answer("Message saved! Click the '📬 Post' button to forward it to the connected chat or click '🚫 Cancel' to cancel.", reply_markup=keyboard)
 
 # Modify the callback handler to process button clicks for forwarding
-@router.message(lambda message: message.text in ["📬 Post", "🚫 Cancel"])
+@router.message(lambda message: message.text in ["📬 FORWARD", "🚫 CANCEL"])
 async def callback_forward_post_cancel(message: types.Message):
     # Retrieve the saved forwarded message ID from the dictionary using the user's ID as the key
     forwarded_message_id = user_input_dict.get(message.from_user.id)
