@@ -9,6 +9,7 @@ from aiogram.filters import Command
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from constants import *
 from db import *
 from aiogram.fsm.state import State, StatesGroup
@@ -176,46 +177,47 @@ async def process_forwarded_message(message: types.Message):
     # Store the forwarded message ID in the user input dictionary
     user_input_dict[message.from_user.id] = message.message_id
 
-    # Provide inline buttons for posting or canceling
-    inline_keyboard = InlineKeyboardMarkup(row_width=2)
-    inline_keyboard.add(
-        InlineKeyboardButton(text="📬 Post", callback_data="forward_post"),
-        InlineKeyboardButton(text="🚫 Cancel", callback_data="forward_cancel")
+    # Provide keyboard buttons for posting or canceling
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="📬 Forward"), KeyboardButton(text="🚫 Cancel")]
+        ],
+        resize_keyboard=True,
     )
 
-    await message.answer("Message saved! Click the 'Post' button to forward it to the connected chat or click 'Cancel' to cancel.", reply_markup=inline_keyboard)
+    await message.answer("Message saved! Click the '📬 Post' button to forward it to the connected chat or click '🚫 Cancel' to cancel.", reply_markup=keyboard)
 
-# Modify the callback handler to process inline button clicks for forwarding
-@router.callback_query(lambda query: query.data in ["forward_post", "forward_cancel"])
-async def callback_forward_post_cancel(query: types.CallbackQuery):
+# Modify the callback handler to process button clicks for forwarding
+@router.message(lambda message: message.text in ["📬 Post", "🚫 Cancel"])
+async def callback_forward_post_cancel(message: types.Message):
     # Retrieve the saved forwarded message ID from the dictionary using the user's ID as the key
-    forwarded_message_id = user_input_dict.get(query.from_user.id)
+    forwarded_message_id = user_input_dict.get(message.from_user.id)
 
-    if query.data == "forward_post":
+    if message.text == "📬 Post":
         if forwarded_message_id:
             # Retrieve the connected chat ID from the user's information
-            user_info = await db.users.find_one({"user_id": query.from_user.id})
+            user_info = await db.users.find_one({"user_id": message.from_user.id})
             connected_chat = user_info.get("connected_chat")
 
             if connected_chat:
                 # Forward the entire message to the connected chat
                 try:
-                    await query.bot.forward_message(chat_id=connected_chat, from_chat_id=query.message.forward_from_chat.id, message_id=forwarded_message_id)
-                    await query.answer("Message forwarded successfully!")
+                    await message.bot.forward_message(chat_id=connected_chat, from_chat_id=message.forward_from_chat.id, message_id=forwarded_message_id)
+                    await message.answer("Message forwarded successfully!")
                 except Exception as e:
-                    await query.answer(f"Error forwarding message: {e}")
+                    await message.answer(f"Error forwarding message: {e}")
             else:
-                await query.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
+                await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
         else:
-            await query.answer("No message found. Please select a message to forward first.")
+            await message.answer("No message found. Please select a message to forward first.")
 
         # Remove the user's ID from the dictionary
-        del user_input_dict[query.from_user.id]
+        del user_input_dict[message.from_user.id]
 
-    elif query.data == "forward_cancel":
-        await query.answer("Forward canceled!")
+    elif message.text == "🚫 Cancel":
+        await message.answer("Forward canceled!")
         # Remove the user's ID from the dictionary
-        del user_input_dict[query.from_user.id]
+        del user_input_dict[message.from_user.id]
 
 @router.message(lambda message: message.text == "Connect")
 async def cmd_connect(message: types.Message):
