@@ -184,15 +184,16 @@ async def process_clone_message(message: types.Message):
         connected_chat = user_info.get("connected_chat")
 
         if connected_chat:
-            # Extract ReactionTypeCustomEmoji data if present
-            reaction_type_custom_emoji = message.reply_to_message.reaction_type_custom_emoji
-
-            # Clone the message with reply markup (including inline buttons) and ReactionTypeCustomEmoji data
-            cloned_message = await message.copy_to(
-                chat_id=connected_chat,
-                reply_markup=message.reply_markup,
-                reaction_type_custom_emoji=reaction_type_custom_emoji
-            )
+            # Clone the message with premium emojis
+            # Retrieve the text and emoji from the original message
+            original_text = message.text
+            original_emoji = message.entities[0].to_dict()['text']
+            
+            # Send the emoji using send_dice method
+            await message.bot.send_dice(chat_id=connected_chat, emoji=original_emoji)
+            # Send the text separately
+            await message.bot.send_message(chat_id=connected_chat, text=original_text)
+            
             await message.answer("Message cloned and sent successfully!")
         else:
             await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
