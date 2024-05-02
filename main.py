@@ -191,7 +191,7 @@ async def process_forwarded_message(message: types.Message):
 @router.message(lambda message: message.text in ["📬 FORWARD", "🚫 CANCEL"])
 async def callback_forward_post_cancel(message: types.Message):
     # Retrieve the saved forwarded message ID from the dictionary using the user's ID as the key
-    forwarded_message_id = user_input_dict.get(message.from_user.id)
+    forwarded_message_id = user_input_dict.get(message.from_user.id, "")
 
     if message.text == "📬 FORWARD":
         if forwarded_message_id:
