@@ -19,6 +19,9 @@ user_input_dict = {}
 # Set the event loop policy to uvloop
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
+class CloneState(StatesGroup):
+    waiting_for_message = State()
+
 @router.message(Command("start"))
 async def cmd_start(message: types.Message):
     # Create a custom keyboard with only "Create Post" button
@@ -164,55 +167,12 @@ async def cmd_post_cancel(message: types.Message):
 
     await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
 
-@router.message(lambda message: message.text == "Forward")
-async def cmd_forward_input(message: types.Message):
-    # Prompt the user to forward the current message
-    await message.answer("Please forward the message you want to send to the connected chat.")
+@router.message(lambda message: message.text == "🌟 Create Post 🌟")
+async def cmd_create_post(message: types.Message):
+    # Reset the state for the user
+    user_input_dict[message.from_user.id] = {"state": "main_menu", "cloning": False}
 
-@router.message(lambda message: message.forward_from_chat)
-async def process_forward_input(message: types.Message):
-    # Check if the message is a forwarded message
-    if message.forward_from_chat:
-        # Retrieve the connected chat ID from the user's information
-        user_info = await db.users.find_one({"user_id": message.from_user.id})
-        connected_chat = user_info.get("connected_chat")
-
-        if connected_chat:
-            # Provide keyboard with FORWARD and CANCEL buttons
-            keyboard = ReplyKeyboardMarkup(
-                keyboard=[[KeyboardButton(text="FORWARD"), KeyboardButton(text="CANCEL")]],
-                resize_keyboard=True,
-            )
-
-            await message.answer("Message received! Do you want to FORWARD or CANCEL?",
-                                 reply_markup=keyboard)
-        else:
-            await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
-    else:
-        # If it's not a forwarded message, prompt the user to forward a message
-        await message.answer("Please forward the message you want to send to the connected chat.")
-
-@router.message(lambda message: message.text in ["FORWARD", "CANCEL"])
-async def cmd_forward_cancel(message: types.Message):
-    # Retrieve the connected chat ID from the user's information
-    user_info = await db.users.find_one({"user_id": message.from_user.id})
-    connected_chat = user_info.get("connected_chat")
-
-    if message.text == "FORWARD":
-        if connected_chat:
-            # Forward the message to the connected chat
-            try:
-                await message.forward(chat_id=connected_chat)
-                await message.answer("Message forwarded successfully!")
-            except Exception as e:
-                await message.answer(f"Error forwarding message: {e}")
-        else:
-            await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
-
-    elif message.text == "CANCEL":
-        await message.answer("Forward canceled!")
-
-    # Go back to the "🌟 Create Post 🌟" menu
+    # Create a custom keyboard with options
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="🌟 Create Post 🌟")],
@@ -221,7 +181,44 @@ async def cmd_forward_cancel(message: types.Message):
         resize_keyboard=True,
     )
 
-    await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
+    # Send the welcome message with the custom keyboard
+    await message.answer(
+        f"Hello, <b>{message.from_user.full_name} !</b>\n"
+        "You can use the following options:",
+        reply_markup=keyboard,
+        parse_mode=ParseMode.HTML
+    )
+
+
+# Inside the message handler for the "Clone" button
+@router.message(lambda message: message.text == "Clone")
+async def cmd_clone(message: types.Message):
+    # Set the cloning state for the user
+    user_input_dict[message.from_user.id]["state"] = "cloning"
+
+    # Ask for the message to clone
+    await message.answer("Please send the message you want to clone.")
+
+
+# Inside the message handler for receiving the message to clone
+@dp.message_handler(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "cloning")
+async def process_clone_message(message: types.Message):
+    # Retrieve the connected chat from the user's information
+    user_info = await db.users.find_one({"user_id": message.from_user.id})
+    connected_chat = user_info.get("connected_chat")
+
+    if connected_chat:
+        try:
+            # Clone the message exactly as it is
+            cloned_message = await message.copy_to(chat_id=connected_chat)
+            await message.answer("Message cloned and sent successfully!")
+        except Exception as e:
+            await message.answer(f"Error cloning message: {e}")
+    else:
+        await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
+
+    # Reset the state for the user
+    user_input_dict[message.from_user.id]["state"] = "main_menu"
 
 @router.message(Command("connect"))
 async def cmd_connect(message: types.Message):
