@@ -201,7 +201,7 @@ async def cmd_clone(message: types.Message):
 
 
 # Inside the message handler for receiving the message to clone
-@dp.message_handler(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "cloning")
+@router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "cloning")
 async def process_clone_message(message: types.Message):
     # Retrieve the connected chat from the user's information
     user_info = await db.users.find_one({"user_id": message.from_user.id})
