@@ -184,6 +184,16 @@ async def process_clone_message(message: types.Message):
         if connected_chat:
             # Clone the message with reply markup (including inline buttons)
             cloned_message = await message.copy_to(chat_id=connected_chat, reply_markup=message.reply_markup)
+
+            # Check if the original message contains a sticker
+            if message.sticker:
+                # Download the sticker file
+                sticker_file = await message.sticker.download()
+
+                # Send the sticker file as a new sticker in the cloned message
+                with open(sticker_file, "rb") as sticker:
+                    await cloned_message.reply_sticker(sticker)
+
             await message.answer("Message cloned and sent successfully!")
         else:
             await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
