@@ -187,10 +187,18 @@ async def process_clone_message(message: types.Message):
             # Clone the message with premium emojis
             # Retrieve the text and emoji from the original message
             original_text = message.text
-            original_emoji = message.entities[0].to_dict()['text']
+            original_entities = message.entities
+            original_emoji = None
             
-            # Send the emoji using send_dice method
-            await message.bot.send_dice(chat_id=connected_chat, emoji=original_emoji)
+            # Find the emoji entity
+            for entity in original_entities:
+                if entity.type == "emoji":
+                    original_emoji = entity.text
+                    break
+            
+            if original_emoji:
+                # Send the emoji using send_dice method
+                await message.bot.send_dice(chat_id=connected_chat, emoji=original_emoji)
             # Send the text separately
             await message.bot.send_message(chat_id=connected_chat, text=original_text)
             
