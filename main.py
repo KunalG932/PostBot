@@ -209,8 +209,21 @@ async def process_clone_message(message: types.Message):
 
     if connected_chat:
         try:
-            # Clone the message exactly as it is
-            cloned_message = await message.copy_to(chat_id=connected_chat)
+            # Create a new message content by combining the original message text with the URL buttons
+            new_message_content = message.text + "\n"  # Add the original message text
+
+            # Iterate through the entities of the original message to find URL buttons
+            for entity in message.entities:
+                if entity.type == "text_link":
+                    # Extract URL and button text from the entity
+                    url = message.text[entity.offset:entity.offset + entity.length]
+                    button_text = message.text[entity.offset:entity.offset + entity.length]
+
+                    # Add the URL button to the new message content
+                    new_message_content += f'<a href="{url}">{button_text}</a>\n'
+
+            # Send the new message content to the connected chat
+            await message.bot.send_message(chat_id=connected_chat, text=new_message_content)
             await message.answer("Message cloned and sent successfully!")
         except Exception as e:
             await message.answer(f"Error cloning message: {e}")
