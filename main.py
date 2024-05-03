@@ -3,6 +3,7 @@ import logging
 import asyncio
 import uvloop  # Import uvloop
 import aiogram
+import re
 
 from aiogram import Router
 from aiogram import Bot, Dispatcher, types
@@ -148,17 +149,19 @@ async def add_inline_button(message: types.Message):
     # Set the state to indicate that the user is adding an inline keyboard button
     user_input_dict[message.from_user.id]["state"] = "adding_inline_button"
 
-# Inside the message handler for receiving the inline keyboard button text and URL
 @router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "adding_inline_button")
 async def process_inline_button(message: types.Message):
-    # Extract the text and URL from the message
-    text_url = message.text.split("-", 1)  # Split once
-    if len(text_url) != 2 or not text_url[1].strip().startswith("http"):
+    # Use regular expression to extract the text and URL from the message
+    match = re.match(r'^(.*)\s*-\s*(https?://\S+)$', message.text)
+    if not match:
         await message.answer("Invalid format. Please provide the text and URL in the format: TEXT - URL")
         return
 
+    text = match.group(1).strip()
+    url = match.group(2)
+
     # Format the inline button
-    inline_button = InlineKeyboardButton(text=text_url[0].strip(), url=text_url[1].strip())
+    inline_button = InlineKeyboardButton(text=text, url=url)
 
     # Add the inline button to the post text
     user_input_dict[message.from_user.id]["inline_button"] = inline_button
@@ -170,7 +173,6 @@ async def process_inline_button(message: types.Message):
     )
 
     await message.answer("Inline keyboard button added! Click the 'POST' button to post it in the connected chat or click 'CANCEL' to cancel the post.", reply_markup=keyboard)
-
 
 # Inside the message handler for posting or canceling the post with the inline button
 @router.message(lambda message: message.text in ["📬 POST", "🚫 CANCEL"])
