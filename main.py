@@ -14,7 +14,7 @@ from constants import *
 from db import *
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
-from aiogram.types import InputMediaPhoto, InputMediaDocument
+from aiogram.types import InputMediaPhoto
 
 user_input_dict = {}
 
@@ -109,7 +109,7 @@ async def cmd_text_input(message: types.Message):
     await message.answer("Please provide the text for your post.")
 
     # Store the user's ID as the key and initialize an empty string as the value
-    user_input_dict[message.from_user.id] = {"text": "", "media": []}
+    user_input_dict[message.from_user.id] = {"text": "", "media": None}
 
 @router.message(lambda message: message.from_user.id in user_input_dict and user_input_dict[message.from_user.id]["text"] == "")
 async def process_text_input(message: types.Message):
@@ -117,23 +117,17 @@ async def process_text_input(message: types.Message):
     if message.photo:
         # If it's a photo, extract the largest photo available and its file ID
         photo = message.photo[-1]  # Get the largest photo
-        media = InputMediaPhoto(media=photo.file_id, caption=message.caption)
-        user_input_dict[message.from_user.id]["media"].append(media)
+        media = [InputMediaPhoto(media=photo.file_id, caption=message.caption)]
+        user_input_dict[message.from_user.id]["media"] = media
     elif message.document:
-        # If it's a document, check if it's a GIF
-        if message.document.mime_type == "video/mp4" and message.document.file_name.endswith(".gif"):
-            # If it's a GIF, add it as media
-            media = InputMediaDocument(media=message.document.file_id, caption=message.caption)
-            user_input_dict[message.from_user.id]["media"].append(media)
-    elif message.animation:
-        # If it's an animation (GIF), add it as media
-        media = InputMediaDocument(media=message.animation.file_id, caption=message.caption)
-        user_input_dict[message.from_user.id]["media"].append(media)
+        # Handle other types of media like documents, videos, etc. if needed
+        pass
 
-    # Check if any media (including GIFs) were added
-    if not user_input_dict[message.from_user.id]["media"]:
-        await message.answer("No media found. Please provide either media or text to post first.")
-        return
+    # Retrieve the text input from the message
+    post_text = message.text
+
+    # Save the text in the dictionary using the user's ID as the key
+    user_input_dict[message.from_user.id]["text"] = post_text
 
     # Provide a keyboard with "POST" and "CANCEL" buttons
     keyboard = ReplyKeyboardMarkup(
@@ -141,13 +135,13 @@ async def process_text_input(message: types.Message):
         resize_keyboard=True,
     )
 
-    await message.answer("Media saved! Click the 'POST' button to post it in the connected chat or click 'CANCEL' to cancel the post.", reply_markup=keyboard)
+    await message.answer("Text saved! Click the 'POST' button to post it in the connected chat or click 'CANCEL' to cancel the post.", reply_markup=keyboard)
 
 @router.message(lambda message: message.text in ["📬 POST", "🚫 CANCEL"])
 async def cmd_post_cancel(message: types.Message):
     # Retrieve the saved text and media from the dictionary using the user's ID as the key
-    post_text = user_input_dict.get(message.from_user.id, {"text": "", "media": []})["text"]
-    post_media = user_input_dict.get(message.from_user.id, {"text": "", "media": []})["media"]
+    post_text = user_input_dict.get(message.from_user.id, {"text": "", "media": None})["text"]
+    post_media = user_input_dict.get(message.from_user.id, {"text": "", "media": None})["media"]
 
     if message.text == "📬 POST":
         if post_text or post_media:
