@@ -155,6 +155,7 @@ async def process_inline_button_input(message: types.Message):
     await message.answer("Inline button added! Click the 'POST' button to post the message with the inline button attached or click 'CANCEL' to cancel the post.", reply_markup=keyboard)
 
 # Inside the message handler for processing the post or cancel action
+# Inside the message handler for processing the post or cancel action
 @router.message(lambda message: message.text in ["📬 POST", "🚫 CANCEL"])
 async def cmd_post_cancel(message: types.Message):
     # Retrieve the saved text, media, and inline button from the dictionary using the user's ID as the key
@@ -163,7 +164,8 @@ async def cmd_post_cancel(message: types.Message):
     inline_button = user_input_dict.get(message.from_user.id, {}).get("inline_button")
 
     if message.text == "📬 POST":
-        if post_text or post_media:
+        # Check if there's either text, media, or an inline button to post
+        if post_text or post_media or inline_button:
             # Retrieve the connected chat ID from the user's information
             user_info = await db.users.find_one({"user_id": message.from_user.id})
             connected_chat = user_info.get("connected_chat")
@@ -185,7 +187,7 @@ async def cmd_post_cancel(message: types.Message):
             else:
                 await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
         else:
-            await message.answer("No text found. Please provide either text or media to post first.")
+            await message.answer("No text found. Please provide either text, media, or an inline button to post first.")
 
         # Remove the user's ID from the dictionary
         del user_input_dict[message.from_user.id]
