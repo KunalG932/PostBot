@@ -14,6 +14,7 @@ from constants import *
 from db import *
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
+from aiogram.types import InputMediaPhoto
 
 user_input_dict = {}
 
@@ -116,8 +117,7 @@ async def process_text_input(message: types.Message):
     if message.photo:
         # If it's a photo, extract the largest photo available and its file ID
         photo = message.photo[-1]  # Get the largest photo
-        media = types.MediaGroup()
-        media.attach_photo(photo.file_id)
+        media = [InputMediaPhoto(media=photo.file_id, caption=message.caption)]
         user_input_dict[message.from_user.id]["media"] = media
     elif message.document:
         # Handle other types of media like documents, videos, etc. if needed
