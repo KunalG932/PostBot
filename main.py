@@ -130,16 +130,18 @@ async def process_text_input(message: types.Message):
         media = InputMediaDocument(media=message.animation.file_id, caption=message.caption)
         user_input_dict[message.from_user.id]["media"].append(media)
 
-    # Retrieve the text input from the message
-    post_text = message.text
-
     # Check if any media (including GIFs) were added
-    if not post_text and not user_input_dict[message.from_user.id]["media"]:
-        await message.answer("No text or media found. Please provide either text or media to post first.")
-        return
+    if not user_input_dict[message.from_user.id]["media"]:
+        # Retrieve the text input from the message
+        post_text = message.text
 
-    # Save the text in the dictionary using the user's ID as the key
-    user_input_dict[message.from_user.id]["text"] = post_text
+        # Check if text is provided
+        if not post_text:
+            await message.answer("No text or media found. Please provide either text or media to post first.")
+            return
+
+        # Save the text in the dictionary using the user's ID as the key
+        user_input_dict[message.from_user.id]["text"] = post_text
 
     # Provide a keyboard with "POST" and "CANCEL" buttons
     keyboard = ReplyKeyboardMarkup(
