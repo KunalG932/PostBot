@@ -152,15 +152,25 @@ async def process_inline_buttons_choice(message: types.Message):
         await post_or_cancel(message)
 
 # Inside the message handler for processing inline buttons input
+# Inside the message handler for processing inline buttons input
 @router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("text") != "" and user_input_dict.get(message.from_user.id, {}).get("inline_buttons") is None)
 async def process_inline_buttons_input(message: types.Message):
-    # Retrieve the inline buttons input from the message
-    inline_buttons = message.text
+    try:
+        # Retrieve the user's ID
+        user_id = message.from_user.id
 
-    # Save the inline buttons in the dictionary using the user's ID as the key
-    user_input_dict[message.from_user.id]["inline_buttons"] = inline_buttons
+        # Ensure that the user's ID exists in the dictionary
+        user_input_dict.setdefault(user_id, {})
 
-    await post_or_cancel(message)
+        # Retrieve the inline buttons input from the message
+        inline_buttons = message.text
+
+        # Save the inline buttons in the dictionary using the user's ID as the key
+        user_input_dict[user_id]["inline_buttons"] = inline_buttons
+
+        await post_or_cancel(message)
+    except Exception as e:
+        await message.answer(f"An error occurred: {e}")
 
 # Function to handle post or cancel options
 async def post_or_cancel(message: types.Message):
