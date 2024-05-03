@@ -14,7 +14,7 @@ from constants import *
 from db import *
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
-from aiogram.types import InputMediaPhoto
+from aiogram.types import InputMediaPhoto, InlineKeyboardButton, InlineKeyboardMarkup
 
 user_input_dict = {}
 
@@ -153,6 +153,7 @@ async def process_inline_buttons_choice(message: types.Message):
 
 # Inside the message handler for processing inline buttons input
 # Inside the message handler for processing inline buttons input
+# Inside the message handler for processing inline buttons input
 @router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("text") != "" and user_input_dict.get(message.from_user.id, {}).get("inline_buttons") is None)
 async def process_inline_buttons_input(message: types.Message):
     # Retrieve the inline buttons input from the message
@@ -161,8 +162,8 @@ async def process_inline_buttons_input(message: types.Message):
     # Split the input by newline characters to get individual button texts with links
     button_lines = inline_buttons_input.split("\n")
 
-    # Create a list to store the InlineKeyboardButton objects
-    inline_keyboard = types.InlineKeyboardMarkup()
+    # Create an InlineKeyboardMarkup object to store the inline buttons
+    inline_keyboard = InlineKeyboardMarkup()
 
     for line in button_lines:
         # Split each line by " - " to separate the button text from the link
@@ -170,7 +171,7 @@ async def process_inline_buttons_input(message: types.Message):
         if len(parts) == 2:
             button_text, button_link = parts
             # Create an InlineKeyboardButton object with the provided text and link
-            inline_button = types.InlineKeyboardButton(text=button_text, url=button_link)
+            inline_button = InlineKeyboardButton(text=button_text, url=button_link)
             # Add the button to the InlineKeyboardMarkup
             inline_keyboard.add(inline_button)
 
