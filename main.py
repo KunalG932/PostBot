@@ -14,7 +14,8 @@ from constants import *
 from db import *
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
-from aiogram.types import InputMediaPhoto, InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import InputMediaPhoto
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 user_input_dict = {}
 
@@ -151,8 +152,6 @@ async def process_inline_buttons_choice(message: types.Message):
     else:
         await post_or_cancel(message)
 
-# Inside the message handler for processing inline buttons input
-# Inside the message handler for processing inline buttons input
 # Inside the message handler for processing inline buttons input
 @router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("text") != "" and user_input_dict.get(message.from_user.id, {}).get("inline_buttons") is None)
 async def process_inline_buttons_input(message: types.Message):
