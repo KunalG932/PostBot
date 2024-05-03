@@ -132,16 +132,8 @@ async def process_text_input(message: types.Message):
 
     # Check if any media (including GIFs) were added
     if not user_input_dict[message.from_user.id]["media"]:
-        # Retrieve the text input from the message
-        post_text = message.text
-
-        # Check if text is provided
-        if not post_text:
-            await message.answer("No text or media found. Please provide either text or media to post first.")
-            return
-
-        # Save the text in the dictionary using the user's ID as the key
-        user_input_dict[message.from_user.id]["text"] = post_text
+        await message.answer("No media found. Please provide either media or text to post first.")
+        return
 
     # Provide a keyboard with "POST" and "CANCEL" buttons
     keyboard = ReplyKeyboardMarkup(
@@ -149,7 +141,7 @@ async def process_text_input(message: types.Message):
         resize_keyboard=True,
     )
 
-    await message.answer("Text saved! Click the 'POST' button to post it in the connected chat or click 'CANCEL' to cancel the post.", reply_markup=keyboard)
+    await message.answer("Media saved! Click the 'POST' button to post it in the connected chat or click 'CANCEL' to cancel the post.", reply_markup=keyboard)
 
 @router.message(lambda message: message.text in ["📬 POST", "🚫 CANCEL"])
 async def cmd_post_cancel(message: types.Message):
