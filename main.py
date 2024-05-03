@@ -155,10 +155,25 @@ async def cmd_add_inline_buttons(message: types.Message):
                          "[Second text + second link]")
 
 # Inside the message handler for receiving inline buttons
+# Inside the message handler for receiving inline buttons
 @router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("text") != "" and message.text != "🔘 Add Inline Buttons" and message.text != "📬 Post" and message.text != "🚫 Cancel")
 async def process_inline_buttons(message: types.Message):
+    # Split the message text into individual button texts and links
+    button_pairs = message.text.split()
+
+    # Prepare the inline buttons markup
+    inline_buttons = ""
+    for i in range(0, len(button_pairs), 2):
+        button_text = button_pairs[i]
+        button_link = button_pairs[i + 1]
+
+        # Format each button as [Button text](Button link)
+        inline_buttons += f"[{button_text}]({button_link})"
+
+        # Add a newline after each button pair
+        inline_buttons += "\n"
+
     # Store the inline buttons in the user input dictionary
-    inline_buttons = message.text
     user_input_dict[message.from_user.id]["inline_buttons"] = inline_buttons
 
     # Provide a keyboard with options to post or cancel
