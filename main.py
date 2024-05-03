@@ -152,17 +152,16 @@ async def process_inline_buttons_choice(message: types.Message):
     else:
         await post_or_cancel(message)
 
-# Inside the message handler for processing inline buttons input
 @router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("text") != "" and user_input_dict.get(message.from_user.id, {}).get("inline_buttons") is None)
 async def process_inline_buttons_input(message: types.Message):
     # Retrieve the inline buttons input from the message
     inline_buttons_input = message.text
 
-    # Split the input by newline characters to get individual button texts with links
+    # Split the input by newline characters to get individual lines of button text with links
     button_lines = inline_buttons_input.split("\n")
 
-    # Create an InlineKeyboardMarkup object to store the inline buttons
-    inline_keyboard = InlineKeyboardMarkup()
+    # Create a list to store InlineKeyboardButton objects
+    inline_keyboard_buttons = []
 
     for line in button_lines:
         # Split each line by " - " to separate the button text from the link
@@ -171,8 +170,11 @@ async def process_inline_buttons_input(message: types.Message):
             button_text, button_link = parts
             # Create an InlineKeyboardButton object with the provided text and link
             inline_button = InlineKeyboardButton(text=button_text, url=button_link)
-            # Add the button to the InlineKeyboardMarkup
-            inline_keyboard.add(inline_button)
+            # Add the button to the list of InlineKeyboardButton objects
+            inline_keyboard_buttons.append(inline_button)
+
+    # Create an InlineKeyboardMarkup object and add the buttons to it
+    inline_keyboard = InlineKeyboardMarkup(inline_keyboard=inline_keyboard_buttons)
 
     # Save the inline keyboard in the dictionary using the user's ID as the key
     user_input_dict[message.from_user.id]["inline_buttons"] = inline_keyboard
