@@ -162,7 +162,7 @@ async def process_inline_buttons_input(message: types.Message):
     button_lines = inline_buttons_input.split("\n")
 
     # Create a list to store the InlineKeyboardButton objects
-    inline_buttons = []
+    inline_keyboard = types.InlineKeyboardMarkup()
 
     for line in button_lines:
         # Split each line by " - " to separate the button text from the link
@@ -171,10 +171,11 @@ async def process_inline_buttons_input(message: types.Message):
             button_text, button_link = parts
             # Create an InlineKeyboardButton object with the provided text and link
             inline_button = types.InlineKeyboardButton(text=button_text, url=button_link)
-            inline_buttons.append([inline_button])
+            # Add the button to the InlineKeyboardMarkup
+            inline_keyboard.add(inline_button)
 
-    # Save the inline buttons in the dictionary using the user's ID as the key
-    user_input_dict[message.from_user.id]["inline_buttons"] = inline_buttons
+    # Save the inline keyboard in the dictionary using the user's ID as the key
+    user_input_dict[message.from_user.id]["inline_buttons"] = inline_keyboard
 
     await post_or_cancel(message)
 
