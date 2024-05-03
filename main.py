@@ -149,10 +149,11 @@ async def add_inline_button(message: types.Message):
     # Set the state to indicate that the user is adding an inline keyboard button
     user_input_dict[message.from_user.id]["state"] = "adding_inline_button"
 
+# Inside the message handler for receiving the inline keyboard button text and URL
 @router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "adding_inline_button")
 async def process_inline_button(message: types.Message):
     # Use regular expression to extract the text and URL from the message
-    match = re.match(r'^(.*)\s*-\s*(https?://\S+)$', message.text)
+    match = re.match(r'^([^-\n]+)\s*-\s*(https?://\S+)$', message.text)
     if not match:
         await message.answer("Invalid format. Please provide the text and URL in the format: TEXT - URL")
         return
