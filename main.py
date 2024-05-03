@@ -104,6 +104,14 @@ async def cmd_chat(message: types.Message):
         reply_markup=keyboard,
     )
 
+@router.message(lambda message: message.text == "Make Post")
+async def cmd_text_input(message: types.Message):
+    # Ask for text input
+    await message.answer("Please provide the text for your post.")
+
+    # Store the user's ID as the key and initialize an empty string as the value
+    user_input_dict[message.from_user.id] = {"text": "", "media": None}
+
 @router.message(lambda message: message.from_user.id in user_input_dict and user_input_dict[message.from_user.id]["text"] == "")
 async def process_text_input(message: types.Message):
     # Check if the message contains media
