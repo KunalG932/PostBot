@@ -51,7 +51,7 @@ async def cmd_create_post(message: types.Message):
     # Create a new keyboard with options: Text, Media, Back
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="Text"), KeyboardButton(text="Clone"), KeyboardButton(text="Quote")],
+            [KeyboardButton(text="Make Post"), KeyboardButton(text="Clone"), KeyboardButton(text="Quote")],
             [KeyboardButton(text="🔙 Back")]
         ],
         resize_keyboard=True,
@@ -102,21 +102,32 @@ async def cmd_chat(message: types.Message):
         reply_markup=keyboard,
     )
 
-@router.message(lambda message: message.text == "Text")
+@router.message(lambda message: message.text == "Make Post")
 async def cmd_text_input(message: types.Message):
     # Ask for text input
     await message.answer("Please provide the text for your post.")
 
     # Store the user's ID as the key and initialize an empty string as the value
-    user_input_dict[message.from_user.id] = ""
+    user_input_dict[message.from_user.id] = {"text": "", "media": None}
 
-@router.message(lambda message: message.from_user.id in user_input_dict and user_input_dict[message.from_user.id] == "")
+@router.message(lambda message: message.from_user.id in user_input_dict and user_input_dict[message.from_user.id]["text"] == "")
 async def process_text_input(message: types.Message):
+    # Check if the message contains media
+    if message.photo:
+        # If it's a photo, extract the largest photo available and its file ID
+        photo = message.photo[-1]  # Get the largest photo
+        media = types.MediaGroup()
+        media.attach_photo(photo.file_id)
+        user_input_dict[message.from_user.id]["media"] = media
+    elif message.document:
+        # Handle other types of media like documents, videos, etc. if needed
+        pass
+
     # Retrieve the text input from the message
     post_text = message.text
 
     # Save the text in the dictionary using the user's ID as the key
-    user_input_dict[message.from_user.id] = post_text
+    user_input_dict[message.from_user.id]["text"] = post_text
 
     # Provide a keyboard with "POST" and "CANCEL" buttons
     keyboard = ReplyKeyboardMarkup(
@@ -128,11 +139,12 @@ async def process_text_input(message: types.Message):
 
 @router.message(lambda message: message.text in ["📬 POST", "🚫 CANCEL"])
 async def cmd_post_cancel(message: types.Message):
-    # Retrieve the saved text from the dictionary using the user's ID as the key
-    post_text = user_input_dict.get(message.from_user.id, "")
+    # Retrieve the saved text and media from the dictionary using the user's ID as the key
+    post_text = user_input_dict.get(message.from_user.id, {"text": "", "media": None})["text"]
+    post_media = user_input_dict.get(message.from_user.id, {"text": "", "media": None})["media"]
 
     if message.text == "📬 POST":
-        if post_text:
+        if post_text or post_media:
             # Retrieve the connected chat ID from the user's information
             user_info = await db.users.find_one({"user_id": message.from_user.id})
             connected_chat = user_info.get("connected_chat")
@@ -140,14 +152,18 @@ async def cmd_post_cancel(message: types.Message):
             if connected_chat:
                 # Post the message in the connected chat
                 try:
-                    await message.bot.send_message(chat_id=connected_chat, text=post_text)
+                    # If media is present, send it along with the text
+                    if post_media:
+                        await message.bot.send_media_group(chat_id=connected_chat, media=post_media)
+                    if post_text:
+                        await message.bot.send_message(chat_id=connected_chat, text=post_text)
                     await message.answer("Message posted successfully!")
                 except Exception as e:
                     await message.answer(f"Error posting message: {e}")
             else:
                 await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
         else:
-            await message.answer("No text found. Please use the 'Text' option to provide a text message first.")
+            await message.answer("No text found. Please provide either text or media to post first.")
 
         # Remove the user's ID from the dictionary
         del user_input_dict[message.from_user.id]
@@ -169,7 +185,6 @@ async def cmd_post_cancel(message: types.Message):
 
     await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
 
-# Inside the message handler for the "Clone" button
 # Inside the message handler for the "Clone" button
 @router.message(lambda message: message.text == "Clone")
 async def cmd_clone(message: types.Message):
