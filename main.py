@@ -152,8 +152,8 @@ async def add_inline_button(message: types.Message):
 @router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "adding_inline_button")
 async def process_inline_button(message: types.Message):
     # Extract the text and URL from the message
-    text_url = message.text.split(" - ")
-    if len(text_url) != 2:
+    text_url = message.text.split(" - ", 1)  # Split once
+    if len(text_url) != 2 or not text_url[1].startswith("http"):
         await message.answer("Invalid format. Please provide the text and URL in the format: TEXT - URL")
         return
 
