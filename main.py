@@ -152,7 +152,6 @@ async def process_inline_buttons_choice(message: types.Message):
         await post_or_cancel(message)
 
 # Inside the message handler for processing inline buttons input
-# Inside the message handler for processing inline buttons input
 @router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("text") != "" and user_input_dict.get(message.from_user.id, {}).get("inline_buttons") is None)
 async def process_inline_buttons_input(message: types.Message):
     try:
@@ -200,15 +199,22 @@ async def cmd_post_cancel(message: types.Message):
 
             if connected_chat:
                 try:
-                    # Log the value of inline_buttons
-                    logging.info(f"Inline buttons: {inline_buttons}")
-
-                    # If inline buttons are provided, send them with the message
+                    # If inline buttons are provided, construct the InlineKeyboardMarkup object
                     if inline_buttons:
-                        logging.info("Sending message with inline buttons")
-                        await message.bot.send_message(chat_id=connected_chat, text=post_text, reply_markup=types.InlineKeyboardMarkup().parse(inline_buttons))
+                        inline_keyboard = []
+
+                        # Parse the inline buttons string and create InlineKeyboardButton objects
+                        for button in inline_buttons.split('\n'):
+                            button_text, button_link = button.strip('[]').split('+')
+                            inline_keyboard.append([types.InlineKeyboardButton(text=button_text.strip(), url=button_link.strip())])
+
+                        # Create the InlineKeyboardMarkup object with the constructed inline keyboard
+                        inline_keyboard_markup = types.InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
+
+                        # Send the message with the constructed inline keyboard
+                        await message.bot.send_message(chat_id=connected_chat, text=post_text, reply_markup=inline_keyboard_markup)
                     else:
-                        logging.info("Sending message without inline buttons")
+                        # Send the message without inline buttons
                         await message.bot.send_message(chat_id=connected_chat, text=post_text)
                     await message.answer("Message posted successfully!")
                 except Exception as e:
