@@ -192,7 +192,7 @@ async def cmd_post_cancel(message: types.Message):
         inline_buttons = user_input_dict.get(message.from_user.id, {}).get("inline_buttons")
 
         # Check if either text or media is present
-        if post_text or post_media:
+        if post_text is not None or post_media:
             # Retrieve the connected chat ID from the user's information
             user_info = await db.users.find_one({"user_id": message.from_user.id})
             connected_chat = user_info.get("connected_chat")
