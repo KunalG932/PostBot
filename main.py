@@ -173,6 +173,7 @@ async def post_or_cancel(message: types.Message):
     await message.answer("Inline buttons added! Click the 'POST' button to post it in the connected chat or click 'CANCEL' to cancel the post.", reply_markup=keyboard)
 
 # Inside the message handler for posting or canceling
+# Inside the message handler for posting or canceling
 @router.message(lambda message: message.text in ["📬 POST", "🚫 CANCEL"])
 async def cmd_post_cancel(message: types.Message):
     if message.text == "📬 POST":
@@ -189,15 +190,16 @@ async def cmd_post_cancel(message: types.Message):
 
             if connected_chat:
                 try:
-                    # If media is present, send it along with the text
-                    if post_media:
-                        await message.bot.send_media_group(chat_id=connected_chat, media=post_media)
-                    if post_text:
-                        # If inline buttons are provided, send them with the message
-                        if inline_buttons:
-                            await message.bot.send_message(chat_id=connected_chat, text=post_text, reply_markup=types.InlineKeyboardMarkup().parse(inline_buttons))
-                        else:
-                            await message.bot.send_message(chat_id=connected_chat, text=post_text)
+                    # Log the value of inline_buttons
+                    logging.info(f"Inline buttons: {inline_buttons}")
+
+                    # If inline buttons are provided, send them with the message
+                    if inline_buttons:
+                        logging.info("Sending message with inline buttons")
+                        await message.bot.send_message(chat_id=connected_chat, text=post_text, reply_markup=types.InlineKeyboardMarkup().parse(inline_buttons))
+                    else:
+                        logging.info("Sending message without inline buttons")
+                        await message.bot.send_message(chat_id=connected_chat, text=post_text)
                     await message.answer("Message posted successfully!")
                 except Exception as e:
                     await message.answer(f"Error posting message: {e}")
