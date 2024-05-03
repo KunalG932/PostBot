@@ -152,13 +152,13 @@ async def add_inline_button(message: types.Message):
 @router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "adding_inline_button")
 async def process_inline_button(message: types.Message):
     # Extract the text and URL from the message
-    text_url = message.text.split(" - ", 1)  # Split once
-    if len(text_url) != 2 or not text_url[1].startswith("http"):
+    text_url = message.text.split("-", 1)  # Split once
+    if len(text_url) != 2 or not text_url[1].strip().startswith("http"):
         await message.answer("Invalid format. Please provide the text and URL in the format: TEXT - URL")
         return
 
     # Format the inline button
-    inline_button = InlineKeyboardButton(text=text_url[0], url=text_url[1])
+    inline_button = InlineKeyboardButton(text=text_url[0].strip(), url=text_url[1].strip())
 
     # Add the inline button to the post text
     user_input_dict[message.from_user.id]["inline_button"] = inline_button
@@ -170,6 +170,7 @@ async def process_inline_button(message: types.Message):
     )
 
     await message.answer("Inline keyboard button added! Click the 'POST' button to post it in the connected chat or click 'CANCEL' to cancel the post.", reply_markup=keyboard)
+
 
 # Inside the message handler for posting or canceling the post with the inline button
 @router.message(lambda message: message.text in ["📬 POST", "🚫 CANCEL"])
