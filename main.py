@@ -14,6 +14,7 @@ from db import *
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InputMediaPhoto
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 user_input_dict = {}
 
