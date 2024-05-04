@@ -167,27 +167,28 @@ async def process_inline_buttons(message: types.Message):
     # Construct the inline keyboard markup
     inline_keyboard = InlineKeyboardMarkup()
 
-    for button in inline_buttons:
-        # Split each button by '+' to separate text and link
-        button_data = button.strip().split('+')
+    # Check if any inline buttons were provided
+    if inline_buttons:
+        for button in inline_buttons:
+            # Split each button by '+' to separate text and link
+            button_data = button.strip().split('+')
 
-        # Extract button text and link
-        if len(button_data) == 2:
-            button_text = button_data[0].strip()
-            button_link = button_data[1].strip()
+            # Extract button text and link
+            if len(button_data) == 2:
+                button_text = button_data[0].strip()
+                button_link = button_data[1].strip()
 
-            # Add the button to the inline keyboard
-            inline_keyboard.add(InlineKeyboardButton(text=button_text, url=button_link))
-
-    # Check if any buttons were added
-    if inline_keyboard.inline_keyboard:
-        # Save the inline keyboard markup in the user input dictionary
-        user_input_dict[message.from_user.id]["inline_keyboard"] = inline_keyboard
-
-        # Proceed to post
-        await process_post(message)
+                # Add the button to the inline keyboard
+                inline_keyboard.add(InlineKeyboardButton(text=button_text, url=button_link))
     else:
         await message.answer("No inline buttons were provided. Please provide at least one inline button.")
+        return
+
+    # Save the inline keyboard markup in the user input dictionary
+    user_input_dict[message.from_user.id]["inline_keyboard"] = inline_keyboard
+
+    # Proceed to post
+    await process_post(message)
 
 # Function to process the post after adding inline buttons or skipping
 async def process_post(message: types.Message):
