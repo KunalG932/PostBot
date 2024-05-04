@@ -47,21 +47,27 @@ async def cmd_start(message: types.Message):
         upsert=True
     )
 
+# Remove the duplicate handler for the "🌟 Create Post 🌟" command
 @router.message(lambda message: message.text == "🌟 Create Post 🌟")
 async def cmd_create_post(message: types.Message):
-    # Create a new keyboard with options: Text, Media, Back
+    # Reset the state for the user
+    user_input_dict[message.from_user.id] = {"state": "main_menu", "cloning": False}
+
+    # Create a custom keyboard with options
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="Make Post"), KeyboardButton(text="Clone"), KeyboardButton(text="Quote")],
-            [KeyboardButton(text="🔙 Back")]
+            [KeyboardButton(text="🌟 Create Post 🌟")],
+            [KeyboardButton(text="Chat")]
         ],
         resize_keyboard=True,
     )
 
-    # Send the options for creating a post
+    # Send the welcome message with the custom keyboard
     await message.answer(
-        "Choose an option to create a post:",
+        f"Hello, <b>{message.from_user.full_name} !</b>\n"
+        "You can use the following options:",
         reply_markup=keyboard,
+        parse_mode=ParseMode.HTML
     )
 
 # Inside the message handler for the "Back" button
@@ -189,45 +195,38 @@ async def process_inline_buttons(message: types.Message):
 
     await message.answer("Inline button added! Click the '📬 POST' button to post it in the connected chat or click '🚫 CANCEL' to cancel the post.", reply_markup=keyboard)
 
-@router.message(lambda message: message.text in ["📬 POST", "🚫 CANCEL"])
+# Ensure that the cmd_post_cancel handler is properly triggered when the "📬 POST" button is pressed
+@router.message(lambda message: message.text == "📬 POST")
 async def cmd_post_cancel(message: types.Message):
     # Retrieve the saved text, media, and inline keyboard markup from the dictionary
     post_text = user_input_dict.get(message.from_user.id, {"text": "", "media": None})["text"]
     post_media = user_input_dict.get(message.from_user.id, {"text": "", "media": None})["media"]
     inline_keyboard_markup = user_input_dict.get(message.from_user.id, {}).get("inline_keyboard_markup")
 
-    if message.text == "📬 POST":
-        if post_text or post_media:
-            # Retrieve the connected chat ID from the user's information
-            user_info = await db.users.find_one({"user_id": message.from_user.id})
-            connected_chat = user_info.get("connected_chat")
+    if post_text or post_media:
+        # Retrieve the connected chat ID from the user's information
+        user_info = await db.users.find_one({"user_id": message.from_user.id})
+        connected_chat = user_info.get("connected_chat")
 
-            if connected_chat:
-                # Post the message in the connected chat
-                try:
-                    # If media is present, send it along with the text
-                    if post_media:
-                        await message.bot.send_media_group(chat_id=connected_chat, media=post_media)
-                    if post_text:
-                        await message.bot.send_message(chat_id=connected_chat, text=post_text, reply_markup=inline_keyboard_markup)
-                    await message.answer("Message posted successfully!")
-                except Exception as e:
-                    await message.answer(f"Error posting message: {e}")
-            else:
-                await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
+        if connected_chat:
+            try:
+                # If media is present, send it along with the text
+                if post_media:
+                    await message.bot.send_media_group(chat_id=connected_chat, media=post_media)
+                if post_text:
+                    await message.bot.send_message(chat_id=connected_chat, text=post_text, reply_markup=inline_keyboard_markup)
+                await message.answer("Message posted successfully!")
+            except Exception as e:
+                await message.answer(f"Error posting message: {e}")
         else:
-            await message.answer("No text found. Please provide either text or media to post first.")
+            await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
+    else:
+        await message.answer("No text found. Please provide either text or media to post first.")
 
-        # Remove the user's ID from the dictionary
-        del user_input_dict[message.from_user.id]
-    
-    # Optionally, you can provide a response for the "CANCEL" action
-    if message.text == "🚫 CANCEL":
-        await message.answer("Post canceled!")
-        # Remove the user's ID from the dictionary
-        del user_input_dict[message.from_user.id]
+    # Remove the user's ID from the dictionary
+    del user_input_dict[message.from_user.id]
 
-    # Go back to the "🌟 Create Post 🌟" menu
+    # Go back to the main menu
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="🌟 Create Post 🌟")],
