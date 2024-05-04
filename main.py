@@ -1,9 +1,7 @@
-# cloning
 import logging
 import asyncio
 import uvloop  # Import uvloop
 import aiogram
-import re
 
 from aiogram import Router
 from aiogram import Bot, Dispatcher, types
@@ -16,7 +14,6 @@ from db import *
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InputMediaPhoto
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 user_input_dict = {}
 
@@ -133,83 +130,29 @@ async def process_text_input(message: types.Message):
 
     # Provide a keyboard with "POST" and "CANCEL" buttons
     keyboard = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="📬 POST"), KeyboardButton(text="🚫 CANCEL")],
-            [KeyboardButton(text="🔲 ADD INLINE KEYBOARD BUTTON")]
-        ],
+        keyboard=[[KeyboardButton(text="📬 POST"), KeyboardButton(text="🚫 CANCEL")]],
         resize_keyboard=True,
     )
 
     await message.answer("Text saved! Click the 'POST' button to post it in the connected chat or click 'CANCEL' to cancel the post.", reply_markup=keyboard)
 
-# Inside the message handler for adding an inline keyboard button
-@router.message(lambda message: message.text == "🔲 ADD INLINE KEYBOARD BUTTON")
-async def add_inline_button(message: types.Message):
-    await message.answer("Please provide the text and URL for the inline keyboard button in the format: TEXT - URL")
-    # Set the state to indicate that the user is adding an inline keyboard button
-    user_input_dict[message.from_user.id]["state"] = "adding_inline_button"
-
-# Inside the message handler for receiving the inline keyboard button text and URL
-@router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "adding_inline_button")
-async def process_inline_button(message: types.Message):
-    # Use regular expression to extract the text and URL from the message
-    match = re.match(r'^([^-\n]+)\s*-\s*(https?://\S+)$', message.text)
-    if not match:
-        await message.answer("Invalid format. Please provide the text and URL in the format: TEXT - URL")
-        return
-
-    text = match.group(1).strip()
-    url = match.group(2)
-
-    # Format the inline button
-    inline_button = InlineKeyboardButton(text=text, url=url)
-
-    # Add the inline button to the post text
-    user_input_dict[message.from_user.id]["inline_button"] = inline_button
-
-    # Provide a keyboard with "POST" and "CANCEL" buttons
-    keyboard = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="📬 POST"), KeyboardButton(text="🚫 CANCEL")]],
-        resize_keyboard=True,
-    )
-
-    await message.answer("Inline keyboard button added! Click the 'POST' button to post it in the connected chat or click 'CANCEL' to cancel the post.", reply_markup=keyboard)
-
-# Inside the message handler for posting or canceling the post with the inline button
 @router.message(lambda message: message.text in ["📬 POST", "🚫 CANCEL"])
-async def cmd_post_cancel_with_inline_button(message: types.Message):
+async def cmd_post_cancel(message: types.Message):
     # Retrieve the saved text and media from the dictionary using the user's ID as the key
     post_text = user_input_dict.get(message.from_user.id, {"text": "", "media": None})["text"]
     post_media = user_input_dict.get(message.from_user.id, {"text": "", "media": None})["media"]
-    inline_button = user_input_dict.get(message.from_user.id, {}).get("inline_button")
 
     if message.text == "📬 POST":
         if post_text or post_media:
-            # Retrieve the connected chat ID from the user's information
-            user_info = await db.users.find_one({"user_id": message.from_user.id})
-            connected_chat = user_info.get("connected_chat")
-
-            if connected_chat:
-                # Post the message in the connected chat
-                try:
-                    # If media is present, send it along with the text
-                    if post_media:
-                        await message.bot.send_media_group(chat_id=connected_chat, media=post_media)
-                    if post_text:
-                        # Create an inline keyboard with the added button
-                        inline_keyboard = InlineKeyboardMarkup().add(inline_button)
-                        await message.bot.send_message(chat_id=connected_chat, text=post_text, reply_markup=inline_keyboard)
-                    await message.answer("Message posted successfully!")
-                except Exception as e:
-                    await message.answer(f"Error posting message: {e}")
-            else:
-                await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
+            # Check if the user wants to add inline buttons
+            keyboard = ReplyKeyboardMarkup(
+                keyboard=[[KeyboardButton(text="Add Inline Buttons"), KeyboardButton(text="Skip")]],
+                resize_keyboard=True,
+            )
+            await message.answer("Do you want to add inline buttons to the post?", reply_markup=keyboard)
         else:
             await message.answer("No text found. Please provide either text or media to post first.")
 
-        # Remove the user's ID from the dictionary
-        del user_input_dict[message.from_user.id]
-    
     # Optionally, you can provide a response for the "CANCEL" action
     if message.text == "🚫 CANCEL":
         await message.answer("Post canceled!")
@@ -226,6 +169,39 @@ async def cmd_post_cancel_with_inline_button(message: types.Message):
     )
 
     await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
+
+@router.message(lambda message: message.text in ["Add Inline Buttons", "Skip"])
+async def handle_inline_buttons_choice(message: types.Message):
+    if message.text == "Add Inline Buttons":
+        # Ask the user to provide button text and URL
+        await message.answer("Please provide the button text and URL in the format: Button text + URL\nExample: Translator + https://t.me/TransioBot")
+        
+        # Update the user's state to indicate that they are adding inline buttons
+        user_input_dict[message.from_user.id]["state"] = "adding_inline_buttons"
+    else:
+        # Continue with posting without inline buttons
+        await post_without_inline_buttons(message)
+
+@router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "adding_inline_buttons")
+async def handle_inline_buttons_input(message: types.Message):
+    # Parse the button text and URL
+    button_info = message.text.split("+")
+    if len(button_info) != 2:
+        await message.answer("Invalid format. Please provide the button text and URL in the correct format.")
+        return
+
+    button_text = button_info[0].strip()
+    button_url = button_info[1].strip()
+
+    # Save the inline button information
+    user_input_dict[message.from_user.id]["inline_buttons"] = [{"text": button_text, "url": button_url}]
+
+    # Provide options to post or cancel the post
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="📬 POST"), KeyboardButton(text="🚫 CANCEL")]],
+        resize_keyboard=True,
+    )
+    await message.answer("Inline buttons added successfully! Click the 'POST' button to post it in the connected chat or click 'CANCEL' to cancel the post.", reply_markup=keyboard)
 
 # Inside the message handler for the "Clone" button
 @router.message(lambda message: message.text == "Clone")
