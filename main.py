@@ -167,7 +167,11 @@ async def process_inline_buttons(message: types.Message):
     # Create a list to store InlineKeyboardButton objects
     inline_keyboard = []
     for button in buttons:
-        button_text, button_url = button.strip().split('+')
+        button_parts = button.strip().split('+')
+        if len(button_parts) != 2:
+            await message.answer("Invalid format for button: {}. Please use the format 'Button text + URL'.".format(button))
+            return
+        button_text, button_url = button_parts
         inline_keyboard.append(InlineKeyboardButton(text=button_text.strip(), url=button_url.strip()))
 
     # Create an InlineKeyboardMarkup with the buttons
