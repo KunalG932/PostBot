@@ -159,37 +159,26 @@ async def process_inline_buttons(message: types.Message):
         await message.answer("Please send the button(s) in the specified format.")
         return
 
-    # Retrieve the button text and URLs from the message
-    buttons = message.text.split('|')
-
-    # Create a list to store InlineKeyboardButton objects
-    inline_keyboard = []
-    for button in buttons:
-        print("Button Before Split:", button)  # Debug print
+    # Retrieve the button text and URL from the message
+    button_parts = message.text.strip().split('+')
+    if len(button_parts) != 2:
+        await message.answer("Invalid format for button: {}. Please use the format 'Button text + URL'.".format(message.text))
+        return
         
-        # Check if the button input contains the "+" character
-        if "+" not in button:
-            await message.answer("Invalid format for button: {}. Please use the format 'Button text + URL'.".format(button))
-            return
-        
-        button_parts = button.strip().split('+')
-        if len(button_parts) != 2:
-            await message.answer("Invalid format for button: {}. Please use the format 'Button text + URL'.".format(button))
-            return
-        
-        # Strip whitespace from the button text and URL
-        button_text, button_url = button_parts[0].strip(), button_parts[1].strip()
+    # Strip whitespace from the button text and URL
+    button_text, button_url = button_parts[0].strip(), button_parts[1].strip()
 
-        # Print out the button text and URL for debugging
-        print("Button Text:", button_text)
-        print("Button URL:", button_url)
+    # Print out the button text and URL for debugging
+    print("Button Text:", button_text)
+    print("Button URL:", button_url)
 
-        inline_keyboard.append(InlineKeyboardButton(text=button_text, url=button_url))
+    # Create an InlineKeyboardButton object with the button text and URL
+    inline_keyboard_button = InlineKeyboardButton(text=button_text, url=button_url)
 
-    # Create an InlineKeyboardMarkup with the buttons
-    inline_keyboard_markup = InlineKeyboardMarkup(inline_keyboard=[inline_keyboard])
+    # Create an InlineKeyboardMarkup with the button
+    inline_keyboard_markup = InlineKeyboardMarkup(inline_keyboard=[[inline_keyboard_button]])
 
-    # Save the inline keyboard markup in the user input dictionary
+    # Save the InlineKeyboardMarkup in the user input dictionary
     user_input_dict[message.from_user.id]["inline_keyboard_markup"] = inline_keyboard_markup
 
     # Provide a keyboard with options: "📬 POST" and "🚫 CANCEL"
@@ -198,7 +187,7 @@ async def process_inline_buttons(message: types.Message):
         resize_keyboard=True,
     )
 
-    await message.answer("Inline buttons added! Click the '📬 POST' button to post it in the connected chat or click '🚫 CANCEL' to cancel the post.", reply_markup=keyboard)
+    await message.answer("Inline button added! Click the '📬 POST' button to post it in the connected chat or click '🚫 CANCEL' to cancel the post.", reply_markup=keyboard)
 
 @router.message(lambda message: message.text in ["📬 POST", "🚫 CANCEL"])
 async def cmd_post_cancel(message: types.Message):
