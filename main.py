@@ -164,11 +164,11 @@ async def process_inline_buttons(message: types.Message):
     # Split the input by new lines to get individual inline buttons
     inline_buttons = inline_buttons_text.split('\n')
 
-    # Construct the inline keyboard markup
-    inline_keyboard = InlineKeyboardMarkup()
-
     # Check if any inline buttons were provided
     if inline_buttons:
+        # Construct the inline keyboard markup
+        inline_keyboard = InlineKeyboardMarkup()
+        
         for button in inline_buttons:
             # Split each button by '+' to separate text and link
             button_data = button.strip().split('+')
