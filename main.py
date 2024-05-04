@@ -170,6 +170,11 @@ async def process_inline_buttons(message: types.Message):
         if len(button_parts) != 2:
             await message.answer("Invalid format for button: {}. Please use the format 'Button text + URL'.".format(button))
             return
+        
+        # Print out the button parts for debugging
+        print("Button Text:", button_parts[0])
+        print("Button URL:", button_parts[1])
+
         button_text, button_url = button_parts
         inline_keyboard.append(InlineKeyboardButton(text=button_text.strip(), url=button_url.strip()))
 
