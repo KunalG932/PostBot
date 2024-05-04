@@ -166,6 +166,12 @@ async def process_inline_buttons(message: types.Message):
     inline_keyboard = []
     for button in buttons:
         print("Button Before Split:", button)  # Debug print
+        
+        # Check if the button input contains the "+" character
+        if "+" not in button:
+            await message.answer("Invalid format for button: {}. Please use the format 'Button text + URL'.".format(button))
+            return
+        
         button_parts = button.strip().split('+')
         if len(button_parts) != 2:
             await message.answer("Invalid format for button: {}. Please use the format 'Button text + URL'.".format(button))
