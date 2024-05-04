@@ -149,7 +149,6 @@ async def cmd_add_inline_buttons(message: types.Message):
                          "Example:\n"
                          "Button 1 + https://example.com\n"
                          "To add multiple buttons, separate them with '|'.")
-
     # Update the user's state to indicate that they are adding inline buttons
     user_input_dict[message.from_user.id]["state"] = "adding_buttons"
 
@@ -193,7 +192,6 @@ async def process_inline_buttons(message: types.Message):
     )
 
     await message.answer("Inline buttons added! Click the '📬 POST' button to post it in the connected chat or click '🚫 CANCEL' to cancel the post.", reply_markup=keyboard)
-
 
 @router.message(lambda message: message.text in ["📬 POST", "🚫 CANCEL"])
 async def cmd_post_cancel(message: types.Message):
