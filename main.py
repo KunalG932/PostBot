@@ -146,8 +146,10 @@ async def add_inline_buttons(message: types.Message):
 
 @router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "adding_inline_buttons")
 async def process_inline_button_input(message: types.Message):
+    print("Received message:", message.text)  # Print the received message for debugging
     # Retrieve the provided text and URL for the inline button
     button_info = message.text.split('|')
+    print("Button info:", button_info)  # Print the split button information for debugging
     if len(button_info) != 2:
         await message.answer("Invalid input format. Please provide the URL link with text separated by '|'.")
         return
