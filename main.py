@@ -184,8 +184,9 @@ async def process_inline_buttons(message: types.Message):
         await message.answer("No inline buttons were provided. Please provide at least one inline button.")
         return
 
-    # Save the inline keyboard markup in the user input dictionary
-    user_input_dict[message.from_user.id]["inline_keyboard"] = inline_keyboard
+    # Save the inline keyboard markup in the database
+    user_id = message.from_user.id
+    await db.inline_buttons.insert_one({"user_id": user_id, "inline_keyboard": inline_keyboard.to_python()})
 
     # Proceed to post
     await process_post(message)
