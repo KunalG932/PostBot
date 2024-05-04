@@ -153,7 +153,6 @@ async def cmd_add_inline_buttons(message: types.Message):
     # Update the user's state to indicate that they are adding inline buttons
     user_input_dict[message.from_user.id]["state"] = "adding_buttons"
 
-
 @router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "adding_buttons")
 async def process_inline_buttons(message: types.Message):
     # Check if the message contains text
