@@ -108,16 +108,14 @@ async def cmd_chat(message: types.Message):
 # Inside the message handler for "Make Post"
 @router.message(lambda message: message.text == "Make Post")
 async def cmd_make_post(message: types.Message):
-    await message.answer("Please provide the content for your post in the following format:\n\n"
-                         "Text1 - [Url link 1](url1) | Text2 - [Url link 2](url2)\n"
-                         "Text3 - [Url link 3](url3) | Text4 - [Url link 4](url4)\n"
-                         "Each line represents multiple text and URL pairs separated by '|'.")
+    await message.answer("Please provide the content for your post including media, caption, and inline button format. "
+                         "You can provide media content, text as the caption, and inline buttons at the bottom.")
 
 # Inside the message handler for processing input
 @router.message(lambda message: message.from_user.id in user_input_dict and user_input_dict[message.from_user.id] == "")
 async def process_input(message: types.Message):
     # Save the message content in the dictionary using the user's ID as the key
-    user_input_dict[message.from_user.id] = message.text
+    user_input_dict[message.from_user.id] = message
 
     # Provide a keyboard with "POST" and "CANCEL" buttons
     keyboard = ReplyKeyboardMarkup(
@@ -144,28 +142,26 @@ async def cmd_post_cancel(message: types.Message):
 
         if connected_chat:
             try:
-                # Parse the custom message format to extract text and buttons
-                lines = post_content.split('\n')
-                inline_buttons = []
-                for line in lines:
-                    text_url_pairs = line.strip().split('|')
-                    for pair in text_url_pairs:
-                        text_url_pair = pair.strip().split('-')
-                        text = text_url_pair[0].strip()
-                        url = text_url_pair[1].strip()
-                        inline_buttons.append([InlineKeyboardButton(text=text, url=url)])
+                # Extract media content, caption, and inline button format
+                media = post_content.photo[-1] if post_content.photo else None
+                caption = post_content.caption
+                inline_buttons = post_content.text.split('\n') if post_content.text else []
 
-                # Add additional buttons at the bottom if needed
-                inline_buttons.append([InlineKeyboardButton(text="Button 1", url="url1"),
-                                       InlineKeyboardButton(text="Button 2", url="url2")])  # Modify as needed
-
-                # Create InlineKeyboardMarkup
-                keyboard_markup = InlineKeyboardMarkup(inline_keyboard=inline_buttons)
+                # Create InlineKeyboardMarkup for inline buttons
+                inline_keyboard = []
+                for line in inline_buttons:
+                    buttons = line.strip().split('|')
+                    row = []
+                    for button in buttons:
+                        text_url_pair = button.strip().split('-')
+                        if len(text_url_pair) == 2:
+                            row.append(InlineKeyboardButton(text=text_url_pair[0].strip(),
+                                                            url=text_url_pair[1].strip()))
+                    inline_keyboard.append(row)
+                keyboard_markup = InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
                 # Post the message in the connected chat
-                await message.bot.send_message(chat_id=connected_chat,
-                                               text="",
-                                               reply_markup=keyboard_markup)
+                await message.bot.send_photo(chat_id=connected_chat, photo=media, caption=caption, reply_markup=keyboard_markup)
 
                 await message.answer("Message posted successfully!")
             except Exception as e:
