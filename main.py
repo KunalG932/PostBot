@@ -105,15 +105,14 @@ async def cmd_chat(message: types.Message):
         reply_markup=keyboard,
     )
 
-# Handler for "Make Post"
-# Inside the message handler for the "Make Post" option
+# Inside the message handler for "Make Post"
 @router.message(lambda message: message.text == "Make Post")
 async def cmd_text_input(message: types.Message):
     # Ask for text input
     await message.answer("Please provide the message for your post.")
 
     # Store the user's ID as the key and initialize a dictionary with state as "making_post"
-    user_input_dict[message.from_user.id] = {"state": "making_post"}
+    user_input_dict[message.from_user.id] = {"state": "making_post", "post_content": "", "inline_buttons": []}
 
 # Inside the message handler for text input
 @router.message(lambda message: message.from_user.id in user_input_dict and user_input_dict[message.from_user.id]["state"] == "making_post")
@@ -123,35 +122,29 @@ async def process_text_input(message: types.Message):
     if content_type == ContentType.TEXT:
         # If the message is text, save it as post_text
         post_text = message.text
-        user_input_dict[message.from_user.id]["post_text"] = post_text
-        
-        # Provide keyboard options for posting or canceling
-        keyboard = ReplyKeyboardMarkup(
-            keyboard=[
-                [KeyboardButton(text="📬 POST"), KeyboardButton(text="🚫 CANCEL")]
-            ],
-            resize_keyboard=True,
-        )
-        
-        await message.answer("Text saved! You can now attach media or inline buttons to your post, or click '📬 POST' to post the text.", reply_markup=keyboard)
-        
+        user_input_dict[message.from_user.id]["post_content"] += post_text
+
     elif content_type in [ContentType.PHOTO, ContentType.VIDEO, ContentType.ANIMATION]:
         # If the message is media, save it as media_content
         media_content = message
-        user_input_dict[message.from_user.id]["media_content"] = media_content
-        
-        # Provide keyboard options for posting or canceling
-        keyboard = ReplyKeyboardMarkup(
-            keyboard=[
-                [KeyboardButton(text="📬 POST"), KeyboardButton(text="🚫 CANCEL")]
-            ],
-            resize_keyboard=True,
-        )
-        
-        await message.answer("Media saved! You can now add text or inline buttons to your post, or click '📬 POST' to post the media.", reply_markup=keyboard)
-        
+        user_input_dict[message.from_user.id]["post_content"] += f"\n\n[Attached Media]({media_content.file_id})"
+
+    elif content_type == ContentType.TEXT:
+        # If the message is inline keyboard buttons, extract and store them
+        inline_buttons = extract_inline_buttons(message)
+        user_input_dict[message.from_user.id]["inline_buttons"] += inline_buttons
+
     else:
         await message.answer("Unsupported content type. Please provide text, photo, video, or animation.")
+
+    # Provide keyboard options for posting or canceling
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="📬 POST"), KeyboardButton(text="🚫 CANCEL")]
+        ],
+        resize_keyboard=True,
+    )
+    await message.answer("Post content saved! You can now click '📬 POST' to post the message, or '🚫 CANCEL' to cancel.", reply_markup=keyboard)
 
 # Inside the message handler for posting or canceling
 @router.message(lambda message: message.text in ["📬 POST", "🚫 CANCEL"])
@@ -164,31 +157,30 @@ async def cmd_post_cancel(message: types.Message):
         return
 
     if message.text == "📬 POST":
-        post_text = user_input.get("post_text", "")
-        media_content = user_input.get("media_content")
+        post_content = user_input.get("post_content", "")
+        inline_buttons = user_input.get("inline_buttons", [])
 
-        if not post_text and not media_content:
+        if not post_content and not inline_buttons:
             await message.answer("No post content found.")
             return
 
-        # Construct the message with text and media (if available)
-        post_message = post_text if post_text else ""
-        if media_content:
-            media_file_id = media_content.photo[-1].file_id if media_content.content_type == ContentType.PHOTO else media_content.video.file_id
-            post_message += f"\n\n[Attached Media]({media_file_id})"
-        
-        # Extract and format inline buttons from the message content
-        inline_buttons = extract_inline_buttons(message)
-
-        # Add inline buttons to the post message
+        # Construct the message with text, media, and inline buttons (if available)
+        post_message = post_content
         if inline_buttons:
             for button_text, button_url in inline_buttons:
                 post_message += f"\n\n[{button_text}]({button_url})"
 
         # Post the message in the connected chat
-        # Your logic to post the message goes here
+        connected_chat = user_input.get("connected_chat")
+        if connected_chat:
+            try:
+                await message.bot.send_message(chat_id=connected_chat, text=post_message, parse_mode=ParseMode.MARKDOWN)
+                await message.answer("Message posted successfully!")
+            except Exception as e:
+                await message.answer(f"Error posting message: {e}")
+        else:
+            await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
 
-        await message.answer("Message posted successfully!")
     elif message.text == "🚫 CANCEL":
         await message.answer("Post canceled!")
 
@@ -197,22 +189,6 @@ async def cmd_post_cancel(message: types.Message):
 
     # Go back to the main menu
     await cmd_create_post(message)
-
-# Function to extract inline buttons from the message content
-def extract_inline_buttons(message: types.Message) -> InlineKeyboardMarkup:
-    inline_buttons = []
-
-    # Iterate through message entities to find inline buttons
-    for entity in message.entities:
-        if entity.type == "url":
-            button_text = message.text[entity.offset:entity.offset + entity.length]
-            button_url = button_text  # URL is the same as the button text
-            inline_buttons.append(InlineKeyboardButton(text=button_text, url=button_url))
-
-    # Organize the collection of buttons into an inline keyboard
-    inline_keyboard = InlineKeyboardMarkup(inline_buttons)
-
-    return inline_keyboard
 
 @router.message(lambda message: message.text == "Clone")
 async def cmd_clone(message: types.Message):
