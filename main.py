@@ -105,100 +105,106 @@ async def cmd_chat(message: types.Message):
         reply_markup=keyboard,
     )
 
-# Inside the message handler for "Make Post"
+# Inside the message handler for selecting "Make Post"
 @router.message(lambda message: message.text == "Make Post")
-async def cmd_text_input(message: types.Message):
-    # Ask for text input
-    await message.answer("Please provide the message for your post.")
+async def cmd_make_post(message: types.Message):
+    # Ask the user to provide the post content
+    await message.answer("Please provide the content for your post. You can include text, media, and inline buttons.")
+    # Set the user's state to indicate that they are making a post
+    user_input_dict.setdefault(message.from_user.id, {})["state"] = "making_post"
 
-    # Store the user's ID as the key and initialize a dictionary with state as "making_post"
-    user_input_dict[message.from_user.id] = {"state": "making_post", "post_content": "", "inline_buttons": []}
 
-# Inside the message handler for text input
-@router.message(lambda message: message.from_user.id in user_input_dict and user_input_dict[message.from_user.id]["state"] == "making_post")
-async def process_text_input(message: types.Message):
-    # Check the content type of the message
-    content_type = message.content_type
-    if content_type == ContentType.TEXT:
-        # If the message is text, save it as post_text
-        post_text = message.text
-        user_input_dict[message.from_user.id]["post_content"] += post_text
+# Inside the message handler for receiving the post content
+@router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "making_post")
+async def process_make_post(message: types.Message):
+    # Check if the message contains media (photo, video, document, etc.)
+    if message.photo or message.video or message.document:
+        # If media is present, store it in the user's input dictionary
+        user_input_dict[message.from_user.id]["media"] = message.photo or message.video or message.document
 
-    elif content_type in [ContentType.PHOTO, ContentType.VIDEO, ContentType.ANIMATION]:
-        # If the message is media, save it as media_content
-        media_content = message
-        file_id = ""
-        if content_type == ContentType.PHOTO:
-            file_id = media_content.photo[-1].file_id  # Get the file ID of the last photo
-        elif content_type == ContentType.VIDEO:
-            file_id = media_content.video.file_id  # Get the file ID of the video
-        elif content_type == ContentType.ANIMATION:
-            file_id = media_content.animation.file_id  # Get the file ID of the animation
+    # Check if the message contains text
+    if message.text:
+        # If text is present, store it in the user's input dictionary
+        user_input_dict[message.from_user.id]["text"] = message.text
 
-        user_input_dict[message.from_user.id]["post_content"] += f"\n\n[Attached Media]({file_id})"
+    # Check if the message contains inline buttons
+    if message.entities:
+        for entity in message.entities:
+            # If an inline button is found, extract the button text and URL
+            if entity.type == "text_link":
+                button_text = message.text[entity.offset:entity.offset + entity.length]
+                button_url = entity.url
+                # Store the inline button information in the user's input dictionary
+                user_input_dict[message.from_user.id].setdefault("buttons", []).append({"text": button_text, "url": button_url})
 
-    elif content_type == ContentType.TEXT:
-        # If the message is inline keyboard buttons, extract and store them
-        inline_buttons = extract_inline_buttons(message)
-        user_input_dict[message.from_user.id]["inline_buttons"] += inline_buttons
+    # Inform the user that the post content has been received
+    await message.answer("Post content received. Click the 'Post' button to post it in the connected chat.")
 
-    else:
-        await message.answer("Unsupported content type. Please provide text, photo, video, or animation.")
+    # Provide buttons for "Post" and "Cancel"
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="📬 Post"), KeyboardButton(text="🚫 Cancel")]],
+        resize_keyboard=True,
+    )
 
-    # Keyboard for posting or canceling
+    await message.answer("Text saved! Click the '📬 Post' button to post it in the connected chat or click '🚫 Cancel' to cancel the post.", reply_markup=keyboard)
+
+
+# Inside the message handler for processing the "Post" or "Cancel" button click
+@router.message(lambda message: message.text in ["📬 Post", "🚫 Cancel"])
+async def cmd_post_cancel(message: types.Message):
+    # Retrieve the saved post content from the user's input dictionary
+    post_text = user_input_dict.get(message.from_user.id, {}).get("text", "")
+    post_media = user_input_dict.get(message.from_user.id, {}).get("media")
+    post_buttons = user_input_dict.get(message.from_user.id, {}).get("buttons", [])
+
+    if message.text == "📬 Post":
+        if post_text or post_media:
+            # Retrieve the connected chat ID from the user's information
+            user_info = await db.users.find_one({"user_id": message.from_user.id})
+            connected_chat = user_info.get("connected_chat")
+
+            if connected_chat:
+                try:
+                    # Prepare the post content with media, if any
+                    media_input = None
+                    if post_media:
+                        media_input = [InputMediaPhoto(media.file_id) for media in post_media]
+
+                    # Prepare the inline keyboard with buttons, if any
+                    inline_keyboard = None
+                    if post_buttons:
+                        inline_keyboard = InlineKeyboardMarkup()
+                        for button in post_buttons:
+                            inline_keyboard.add(InlineKeyboardButton(text=button["text"], url=button["url"]))
+
+                    # Post the message in the connected chat
+                    await message.bot.send_media_group(chat_id=connected_chat, media=media_input, caption=post_text, reply_markup=inline_keyboard)
+                    await message.answer("Message posted successfully!")
+                except Exception as e:
+                    await message.answer(f"Error posting message: {e}")
+            else:
+                await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
+        else:
+            await message.answer("No post content found. Please provide text or media for your post.")
+    elif message.text == "🚫 Cancel":
+        await message.answer("Post canceled!")
+    
+    # Remove the user's input data from the dictionary
+    del user_input_dict[message.from_user.id]
+
+    # Reset the user's state
+    user_input_dict[message.from_user.id]["state"] = "main_menu"
+
+    # Provide the main menu keyboard
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="📬 POST"), KeyboardButton(text="🚫 CANCEL")]
+            [KeyboardButton(text="🌟 Create Post 🌟")],
+            [KeyboardButton(text="Chat")]
         ],
         resize_keyboard=True,
     )
 
-    await message.answer("Post content saved! You can now click '📬 POST' to post the message, or '🚫 CANCEL' to cancel.", reply_markup=keyboard)
-
-# Inside the message handler for posting or canceling
-# Inside the message handler for posting or canceling
-@router.message(lambda message: message.text in ["📬 POST", "🚫 CANCEL"])
-async def cmd_post_cancel(message: types.Message):
-    user_id = message.from_user.id
-    user_input = user_input_dict.get(user_id)
-
-    if not user_input or "state" not in user_input or user_input["state"] != "making_post":
-        await message.answer("No post content found.")
-        return
-
-    if message.text == "📬 POST":
-        post_content = user_input.get("post_content", "")
-        inline_buttons = user_input.get("inline_buttons", [])
-
-        if not post_content and not inline_buttons:
-            await message.answer("No post content found.")
-            return
-
-        # Construct the message with text, media, and inline buttons (if available)
-        post_message = post_content
-        if inline_buttons:
-            for button_text, button_url in inline_buttons:
-                post_message += f"\n\n[{button_text}]({button_url})"
-
-        # Post the message in the connected chat
-        connected_chat = user_input.get("connected_chat")
-        if connected_chat:
-            try:
-                await message.bot.send_message(chat_id=connected_chat, text=post_message, parse_mode=ParseMode.MARKDOWN)
-                await message.answer("Message posted successfully!")
-            except Exception as e:
-                await message.answer(f"Error posting message: {e}")
-        else:
-            await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
-
-    elif message.text == "🚫 CANCEL":
-        await message.answer("Post canceled!")
-
-    # Remove user input from the dictionary
-    del user_input_dict[user_id]
-
-    # Go back to the main menu
-    await cmd_create_post(message)
+    await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
 
 @router.message(lambda message: message.text == "Clone")
 async def cmd_clone(message: types.Message):
