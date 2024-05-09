@@ -153,13 +153,11 @@ async def process_make_post(message: types.Message):
 async def cmd_post_cancel(message: types.Message):
     # Retrieve the user's input from the dictionary
     user_input = user_input_dict.get(message.from_user.id, {})
+    post_text = user_input.get("text")
+    post_media = user_input.get("media")
+    post_buttons = user_input.get("buttons")
 
     if message.text == "📬 Post":
-        # Check if the user has provided post content
-        post_text = user_input.get("text")
-        post_media = user_input.get("media")
-        post_buttons = user_input.get("buttons")
-
         if post_text or post_media:
             # Retrieve the connected chat ID from the user's information
             user_info = await db.users.find_one({"user_id": message.from_user.id})
@@ -181,13 +179,12 @@ async def cmd_post_cancel(message: types.Message):
 
                     # Post the message in the connected chat
                     await message.bot.send_media_group(chat_id=connected_chat, media=media_input, caption=post_text, reply_markup=inline_keyboard)
-                    
+
                     # Inform the user that the message has been posted
                     await message.answer("Message posted successfully!")
-                    
+
                     # Reset the user's input data and state
                     del user_input_dict[message.from_user.id]
-                    user_input_dict[message.from_user.id] = {"state": "main_menu"}
 
                     # Provide the main menu keyboard
                     keyboard = ReplyKeyboardMarkup(
@@ -207,24 +204,23 @@ async def cmd_post_cancel(message: types.Message):
                 await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
         else:
             await message.answer("No post content found. Please provide text or media for your post.")
-    
+
     elif message.text == "🚫 Cancel":
         await message.answer("Post canceled!")
 
-        # Reset the user's input data and state
-        del user_input_dict[message.from_user.id]
-        user_input_dict[message.from_user.id] = {"state": "main_menu"}
+    # Reset the user's input data and state
+    del user_input_dict[message.from_user.id]
 
-        # Provide the main menu keyboard
-        keyboard = ReplyKeyboardMarkup(
-            keyboard=[
-                [KeyboardButton(text="🌟 Create Post 🌟")],
-                [KeyboardButton(text="Chat")]
-            ],
-            resize_keyboard=True,
-        )
+    # Provide the main menu keyboard
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🌟 Create Post 🌟")],
+            [KeyboardButton(text="Chat")]
+        ],
+        resize_keyboard=True,
+    )
 
-        await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
+    await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
 
 @router.message(lambda message: message.text == "Clone")
 async def cmd_clone(message: types.Message):
