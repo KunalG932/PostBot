@@ -14,6 +14,8 @@ from constants import *
 from db import *
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
+from aiogram.enums.content_type import  ContentType
+
 
 user_input_dict = {}
 
