@@ -148,6 +148,7 @@ async def process_make_post(message: types.Message):
 
     await message.answer("Text saved! Click the '📬 Post' button to post it in the connected chat or click '🚫 Cancel' to cancel the post.", reply_markup=keyboard)
 
+
 # Inside the message handler for processing the "Post" or "Cancel" button click
 @router.message(lambda message: message.text in ["📬 Post", "🚫 Cancel"])
 async def cmd_post_cancel(message: types.Message):
