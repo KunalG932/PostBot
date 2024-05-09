@@ -113,7 +113,7 @@ async def cmd_make_post(message: types.Message):
 
 # Inside the message handler for processing input
 @router.message(lambda message: message.from_user.id in user_input_dict and user_input_dict[message.from_user.id] == "")
-async def process_input(message: types.Message):
+async def process_input(message: types.Message, state: FSMContext):
     # Save the message content in the dictionary using the user's ID as the key
     user_input_dict[message.from_user.id] = message
 
@@ -124,6 +124,9 @@ async def process_input(message: types.Message):
     )
 
     await message.answer("Content saved! Click the 'POST' button to post it in the connected chat or click 'CANCEL' to cancel the post.", reply_markup=keyboard)
+
+    # Update state to indicate that user has provided content
+    await state.finish()
 
 # Inside the message handler for "📬 POST" and "🚫 CANCEL" buttons
 @router.message(lambda message: message.text in ["📬 POST", "🚫 CANCEL"])
