@@ -51,7 +51,7 @@ async def cmd_create_post(message: types.Message):
     # Create a new keyboard with options: Text, Media, Back
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="Text"), KeyboardButton(text="Clone"), KeyboardButton(text="Quote")],
+            [KeyboardButton(text="Make Post"), KeyboardButton(text="Clone"), KeyboardButton(text="Quote")],
             [KeyboardButton(text="🔙 Back")]
         ],
         resize_keyboard=True,
@@ -102,72 +102,95 @@ async def cmd_chat(message: types.Message):
         reply_markup=keyboard,
     )
 
-@router.message(lambda message: message.text == "Text")
-async def cmd_text_input(message: types.Message):
-    # Ask for text input
-    await message.answer("Please provide the text for your post.")
-
-    # Store the user's ID as the key and initialize an empty string as the value
-    user_input_dict[message.from_user.id] = ""
-
-@router.message(lambda message: message.from_user.id in user_input_dict and user_input_dict[message.from_user.id] == "")
-async def process_text_input(message: types.Message):
-    # Retrieve the text input from the message
-    post_text = message.text
-
-    # Save the text in the dictionary using the user's ID as the key
-    user_input_dict[message.from_user.id] = post_text
-
-    # Provide a keyboard with "POST" and "CANCEL" buttons
-    keyboard = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="📬 POST"), KeyboardButton(text="🚫 CANCEL")]],
-        resize_keyboard=True,
-    )
-
-    await message.answer("Text saved! Click the 'POST' button to post it in the connected chat or click 'CANCEL' to cancel the post.", reply_markup=keyboard)
-
-@router.message(lambda message: message.text in ["📬 POST", "🚫 CANCEL"])
-async def cmd_post_cancel(message: types.Message):
-    # Retrieve the saved text from the dictionary using the user's ID as the key
-    post_text = user_input_dict.get(message.from_user.id, "")
-
-    if message.text == "📬 POST":
-        if post_text:
-            # Retrieve the connected chat ID from the user's information
-            user_info = await db.users.find_one({"user_id": message.from_user.id})
-            connected_chat = user_info.get("connected_chat")
-
-            if connected_chat:
-                # Post the message in the connected chat
-                try:
-                    await message.bot.send_message(chat_id=connected_chat, text=post_text)
-                    await message.answer("Message posted successfully!")
-                except Exception as e:
-                    await message.answer(f"Error posting message: {e}")
-            else:
-                await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
-        else:
-            await message.answer("No text found. Please use the 'Text' option to provide a text message first.")
-
-        # Remove the user's ID from the dictionary
-        del user_input_dict[message.from_user.id]
-    
-    # Optionally, you can provide a response for the "CANCEL" action
-    if message.text == "🚫 CANCEL":
-        await message.answer("Post canceled!")
-        # Remove the user's ID from the dictionary
-        del user_input_dict[message.from_user.id]
-
-    # Go back to the "🌟 Create Post 🌟" menu
+@router.message(lambda message: message.text == "Make Post")
+async def cmd_make_post(message: types.Message):
+    # Create a keyboard with options: Text, Media, Inline Button, All in One
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="🌟 Create Post 🌟")],
-            [KeyboardButton(text="Chat")]
+            [KeyboardButton(text="Text"), KeyboardButton(text="Media"), KeyboardButton(text="Inline Button")],
+            [KeyboardButton(text="All in One")],
+            [KeyboardButton(text="🔙 Back")]
         ],
         resize_keyboard=True,
     )
 
-    await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
+    await message.answer(
+        "Choose the type of post:",
+        reply_markup=keyboard,
+    )
+
+@router.message(lambda message: message.text in ["Text", "Media", "Inline Button", "All in One"])
+async def process_post_type(message: types.Message):
+    post_type = message.text
+
+    if post_type == "Text":
+        await message.answer("Please provide the text for your post.")
+    elif post_type == "Media":
+        await message.answer("Please provide the media (photo, video, document) for your post.")
+    elif post_type == "Inline Button":
+        await message.answer("Please provide the text for your post and the inline button in the format: Button text - URL link.")
+    elif post_type == "All in One":
+        await message.answer("Please provide the text, media, and inline button for your post in separate messages.")
+
+@router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "text_input")
+async def process_text_post(message: types.Message):
+    user_input_dict[message.from_user.id]["post_text"] = message.text
+    await message.answer("Text saved! Please provide the media (photo, video, document) for your post.")
+
+@router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "media_input")
+async def process_media_post(message: types.Message):
+    user_input_dict[message.from_user.id]["media_file_id"] = message.document.file_id
+    await message.answer("Media saved! Please provide the text for your post and the inline button in the format: Button text - URL link.")
+
+@router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "inline_button_input")
+async def process_inline_button_post(message: types.Message):
+    button_text, button_url = message.text.split(" - ")
+    user_input_dict[message.from_user.id]["button_text"] = button_text
+    user_input_dict[message.from_user.id]["button_url"] = button_url
+    await message.answer("Inline button saved! Click the 'POST' button to post it in the connected chat or click 'CANCEL' to cancel the post.")
+
+@router.message(lambda message: message.text in ["📬 POST", "🚫 CANCEL"])
+async def cmd_post_cancel(message: types.Message):
+    user_data = user_input_dict.get(message.from_user.id, {})
+
+    if message.text == "📬 POST":
+        if user_data.get("post_text") and user_data.get("media_file_id") and user_data.get("button_text") and user_data.get("button_url"):
+            await post_all_in_one(user_data, message)
+        else:
+            await message.answer("Not all required data provided.")
+    elif message.text == "🚫 CANCEL":
+        await message.answer("Post canceled!")
+        reset_user_state(message.from_user.id)
+
+async def post_all_in_one(user_data, message):
+    post_text = user_data["post_text"]
+    media_file_id = user_data["media_file_id"]
+    button_text = user_data["button_text"]
+    button_url = user_data["button_url"]
+
+    connected_chat = await get_connected_chat(message.from_user.id)
+
+    if connected_chat:
+        try:
+            inline_keyboard_markup = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton(text=button_text, url=button_url))
+            await message.bot.send_media_group(chat_id=connected_chat, media=[types.InputMediaDocument(media_file_id, caption=post_text)], reply_markup=inline_keyboard_markup)
+            await message.answer("Post with text, media, and inline button sent successfully!")
+        except Exception as e:
+            await message.answer(f"Error posting all in one: {e}")
+    else:
+        await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
+
+    reset_user_state(message.from_user.id)
+
+async def get_connected_chat(user_id):
+    user_info = await db.users.find_one({"user_id": user_id})
+    if user_info:
+        return user_info.get("connected_chat")
+    return None
+
+def reset_user_state(user_id):
+    if user_id in user_input_dict:
+        del user_input_dict[user_id]
 
 # Inside the message handler for the "Clone" button
 # Inside the message handler for the "Clone" button
