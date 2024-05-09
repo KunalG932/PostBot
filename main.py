@@ -106,12 +106,13 @@ async def cmd_chat(message: types.Message):
     )
 
 # Handler for "Make Post"
+# Inside the message handler for the "Make Post" option
 @router.message(lambda message: message.text == "Make Post")
-async def make_post_cmd(message: types.Message):
+async def cmd_text_input(message: types.Message):
     # Ask for text input
     await message.answer("Please provide the message for your post.")
 
-    # Store the user's ID as the key and initialize an empty string as the value
+    # Store the user's ID as the key and initialize a dictionary with state as "making_post"
     user_input_dict[message.from_user.id] = {"state": "making_post"}
 
 # Inside the message handler for text input
@@ -123,12 +124,32 @@ async def process_text_input(message: types.Message):
         # If the message is text, save it as post_text
         post_text = message.text
         user_input_dict[message.from_user.id]["post_text"] = post_text
-        await message.answer("Text saved! You can now attach media or inline buttons to your post, or click '📬 POST' to post the text.")
+        
+        # Provide keyboard options for posting or canceling
+        keyboard = ReplyKeyboardMarkup(
+            keyboard=[
+                [KeyboardButton(text="📬 POST"), KeyboardButton(text="🚫 CANCEL")]
+            ],
+            resize_keyboard=True,
+        )
+        
+        await message.answer("Text saved! You can now attach media or inline buttons to your post, or click '📬 POST' to post the text.", reply_markup=keyboard)
+        
     elif content_type in [ContentType.PHOTO, ContentType.VIDEO, ContentType.ANIMATION]:
         # If the message is media, save it as media_content
         media_content = message
         user_input_dict[message.from_user.id]["media_content"] = media_content
-        await message.answer("Media saved! You can now add text or inline buttons to your post, or click '📬 POST' to post the media.")
+        
+        # Provide keyboard options for posting or canceling
+        keyboard = ReplyKeyboardMarkup(
+            keyboard=[
+                [KeyboardButton(text="📬 POST"), KeyboardButton(text="🚫 CANCEL")]
+            ],
+            resize_keyboard=True,
+        )
+        
+        await message.answer("Media saved! You can now add text or inline buttons to your post, or click '📬 POST' to post the media.", reply_markup=keyboard)
+        
     else:
         await message.answer("Unsupported content type. Please provide text, photo, video, or animation.")
 
@@ -138,8 +159,8 @@ async def cmd_post_cancel(message: types.Message):
     user_id = message.from_user.id
     user_input = user_input_dict.get(user_id)
 
-    if not user_input or user_input.get("state") != "making_post":
-        await message.answer("Invalid state. Please initiate the post creation process.")
+    if not user_input or "state" not in user_input or user_input["state"] != "making_post":
+        await message.answer("No post content found.")
         return
 
     if message.text == "📬 POST":
