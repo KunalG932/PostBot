@@ -15,6 +15,7 @@ from db import *
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from aiogram.enums.content_type import  ContentType
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 
 user_input_dict = {}
@@ -177,15 +178,20 @@ async def cmd_post_cancel(message: types.Message):
     await cmd_create_post(message)
 
 # Function to extract inline buttons from the message content
-def extract_inline_buttons(message: types.Message) -> list:
+def extract_inline_buttons(message: types.Message) -> InlineKeyboardMarkup:
     inline_buttons = []
 
     # Iterate through message entities to find inline buttons
     for entity in message.entities:
-        if entity.type == MessageEntityType.URL:
+        if entity.type == "url":
             button_text = message.text[entity.offset:entity.offset + entity.length]
-            button_url = message.text[entity.offset:entity.offset + entity.length]
-            inline_buttons.append((button_text, button_url))
+            button_url = button_text  # URL is the same as the button text
+            inline_buttons.append(InlineKeyboardButton(text=button_text, url=button_url))
+
+    # Organize the collection of buttons into an inline keyboard
+    inline_keyboard = InlineKeyboardMarkup(inline_buttons)
+
+    return inline_keyboard
 
 @router.message(lambda message: message.text == "Clone")
 async def cmd_clone(message: types.Message):
