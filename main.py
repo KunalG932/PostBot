@@ -136,39 +136,11 @@ async def cmd_post_cancel(message: types.Message):
         return
 
     if message.text == "📬 POST":
-        # Retrieve the connected chat ID from the user's information
-        user_info = await db.users.find_one({"user_id": message.from_user.id})
-        connected_chat = user_info.get("connected_chat")
-
-        if connected_chat:
-            try:
-                # Extract media content, caption, and inline button format
-                media = post_content.photo[-1] if post_content.photo else None
-                caption = post_content.caption
-                inline_buttons = post_content.text.split('\n') if post_content.text else []
-
-                # Create InlineKeyboardMarkup for inline buttons
-                inline_keyboard = []
-                for line in inline_buttons:
-                    buttons = line.strip().split('|')
-                    row = []
-                    for button in buttons:
-                        text_url_pair = button.strip().split('-')
-                        if len(text_url_pair) == 2:
-                            row.append(InlineKeyboardButton(text=text_url_pair[0].strip(),
-                                                            url=text_url_pair[1].strip()))
-                    inline_keyboard.append(row)
-                keyboard_markup = InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
-
-                # Post the message in the connected chat
-                await message.bot.send_photo(chat_id=connected_chat, photo=media, caption=caption, reply_markup=keyboard_markup)
-
-                await message.answer("Message posted successfully!")
-            except Exception as e:
-                await message.answer(f"Error posting message: {e}")
-        else:
-            await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
-    else:  # "🚫 CANCEL" action
+        # Here you can add the code to process and post the content to the connected chat
+        # Example: 
+        # await post_and_send_message(post_content)
+        await message.answer("Post processing and sending functionality will be implemented here.")
+    else:
         await message.answer("Post canceled!")
 
     # Remove the user's ID from the dictionary
