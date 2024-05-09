@@ -165,12 +165,11 @@ async def cmd_post_cancel(message: types.Message):
 
             if connected_chat:
                 try:
-                    # Prepare the post content with media, if any
+                    # Prepare the post content
                     media_input = None
                     if post_media:
                         media_input = [InputMediaPhoto(media.file_id) for media in post_media]
 
-                    # Prepare the inline keyboard with buttons, if any
                     inline_keyboard = None
                     if post_buttons:
                         inline_keyboard = InlineKeyboardMarkup()
