@@ -127,7 +127,15 @@ async def process_text_input(message: types.Message):
     elif content_type in [ContentType.PHOTO, ContentType.VIDEO, ContentType.ANIMATION]:
         # If the message is media, save it as media_content
         media_content = message
-        user_input_dict[message.from_user.id]["post_content"] += f"\n\n[Attached Media]({media_content.file_id})"
+        file_id = ""
+        if content_type == ContentType.PHOTO:
+            file_id = media_content.photo[-1].file_id  # Get the file ID of the last photo
+        elif content_type == ContentType.VIDEO:
+            file_id = media_content.video.file_id  # Get the file ID of the video
+        elif content_type == ContentType.ANIMATION:
+            file_id = media_content.animation.file_id  # Get the file ID of the animation
+
+        user_input_dict[message.from_user.id]["post_content"] += f"\n\n[Attached Media]({file_id})"
 
     elif content_type == ContentType.TEXT:
         # If the message is inline keyboard buttons, extract and store them
@@ -137,13 +145,14 @@ async def process_text_input(message: types.Message):
     else:
         await message.answer("Unsupported content type. Please provide text, photo, video, or animation.")
 
-    # Provide keyboard options for posting or canceling
+    # Keyboard for posting or canceling
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="📬 POST"), KeyboardButton(text="🚫 CANCEL")]
         ],
         resize_keyboard=True,
     )
+
     await message.answer("Post content saved! You can now click '📬 POST' to post the message, or '🚫 CANCEL' to cancel.", reply_markup=keyboard)
 
 # Inside the message handler for posting or canceling
