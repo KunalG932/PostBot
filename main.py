@@ -255,7 +255,7 @@ async def process_normal_clone_message(message: types.Message):
     # Reset the state for the user
     user_input_dict.get(message.from_user.id, {})["state"] = "main_menu"
 
-@router.message(lambda message: message.text == "🌟 Create Post 🌟")
+@router.message(lambda message: message.text == "Create Post")
 async def cmd_create_post(message: types.Message):
     # Reset the state for the user
     user_input_dict[message.from_user.id] = {"state": "main_menu", "cloning": False}
