@@ -105,60 +105,84 @@ async def cmd_chat(message: types.Message):
         reply_markup=keyboard,
     )
 
-# Inside the message handler for "Make Post"
+# Inside the message handler for selecting "Make Post"
 @router.message(lambda message: message.text == "Make Post")
 async def cmd_make_post(message: types.Message):
-    await message.answer("Please provide the content for your post including media, caption, and inline button format. "
-                         "You can provide media content, text as the caption, and inline buttons at the bottom.")
+    # Ask the user to provide the post content
+    await message.answer("Please send the content of your post.")
 
-# Inside the message handler for processing input
-@router.message(lambda message: message.from_user.id in user_input_dict and user_input_dict[message.from_user.id] == "")
-async def process_input(message: types.Message, state: FSMContext):
-    # Save the message content in the dictionary using the user's ID as the key
-    user_input_dict[message.from_user.id] = message
+# Inside the message handler for receiving the post content
+@router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "making_post")
+async def process_post_content(message: types.Message):
+    # Check if the message contains any media
+    has_media = bool(message.photo or message.video or message.animation)
 
-    # Provide a keyboard with "POST" and "CANCEL" buttons
+    # Format the post content with media, caption, and inline buttons if present
+    formatted_content = ""
+
+    # Add media and caption if present
+    if has_media:
+        media_caption = ""
+        if message.caption:
+            media_caption = f"{message.caption}\n"
+        formatted_content += f"{media_caption}[Media attached]"
+
+    # Add inline buttons if present
+    if message.entities:
+        inline_buttons = []
+        for entity in message.entities:
+            if entity.type == "url":
+                inline_buttons.append(f"[{message.text[entity.offset:entity.offset+entity.length]}]({entity.url})")
+        if inline_buttons:
+            formatted_content += "\n\n" + "\n".join(inline_buttons)
+
+    # Save the formatted post content
+    user_input_dict[message.from_user.id]["post_content"] = formatted_content
+
+    # Ask the user to confirm the post
     keyboard = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="📬 POST"), KeyboardButton(text="🚫 CANCEL")]],
+        keyboard=[[KeyboardButton(text="✅ Confirm"), KeyboardButton(text="❌ Cancel")]],
         resize_keyboard=True,
     )
+    await message.answer("Post content:\n" + formatted_content + "\n\nDo you want to post this?", reply_markup=keyboard)
 
-    await message.answer("Content saved! Click the 'POST' button to post it in the connected chat or click 'CANCEL' to cancel the post.", reply_markup=keyboard)
+# Inside the message handler for confirming or canceling the post
+@router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "confirming_post")
+async def process_post_confirmation(message: types.Message):
+    if message.text == "✅ Confirm":
+        # Retrieve the post content from the user's input dictionary
+        post_content = user_input_dict.get(message.from_user.id, {}).get("post_content")
 
-    # Update state to indicate that user has provided content
-    await state.finish()
+        if post_content:
+            # Retrieve the connected chat ID from the user's information
+            user_info = await db.users.find_one({"user_id": message.from_user.id})
+            connected_chat = user_info.get("connected_chat")
 
-# Inside the message handler for "📬 POST" and "🚫 CANCEL" buttons
-@router.message(lambda message: message.text in ["📬 POST", "🚫 CANCEL"])
-async def cmd_post_cancel(message: types.Message):
-    # Retrieve the saved message from the dictionary using the user's ID as the key
-    post_content = user_input_dict.get(message.from_user.id)
+            if connected_chat:
+                # Post the message in the connected chat
+                try:
+                    await message.bot.send_message(chat_id=connected_chat, text=post_content, parse_mode=ParseMode.MARKDOWN)
+                    await message.answer("Message posted successfully!")
+                except Exception as e:
+                    await message.answer(f"Error posting message: {e}")
+            else:
+                await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
+        else:
+            await message.answer("No post content found. Please provide content for your post.")
 
-    if not post_content:
-        await message.answer("No post data found. Please use the 'Make Post' option to create a post first.")
-        return
+        # Reset the user's state
+        user_input_dict[message.from_user.id]["state"] = "main_menu"
+    elif message.text == "❌ Cancel":
+        # Cancel the post and reset the user's state
+        user_input_dict[message.from_user.id]["state"] = "main_menu"
+        await message.answer("Post canceled.")
 
-    if message.text == "📬 POST":
-        # Here you can add the code to process and post the content to the connected chat
-        # Example: 
-        # await post_and_send_message(post_content)
-        await message.answer("Post processing and sending functionality will be implemented here.")
-    else:
-        await message.answer("Post canceled!")
-
-    # Remove the user's ID from the dictionary
-    del user_input_dict[message.from_user.id]
-
-    # Go back to the "🌟 Create Post 🌟" menu
-    keyboard = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="🌟 Create Post 🌟")],
-            [KeyboardButton(text="Chat")]
-        ],
-        resize_keyboard=True,
-    )
-
-    await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
+# Inside the message handler for canceling the post
+@router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "making_post" and message.text == "❌ Cancel")
+async def cancel_post(message: types.Message):
+    # Reset the user's state
+    user_input_dict[message.from_user.id]["state"] = "main_menu"
+    await message.answer("Post canceled.")
 
 @router.message(lambda message: message.text == "Clone")
 async def cmd_clone(message: types.Message):
