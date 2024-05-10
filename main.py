@@ -108,7 +108,7 @@ async def cmd_chat(message: types.Message):
     )
 
 # Message handler for processing incoming messages
-@router.message(content_types=ContentType.PHOTO | ContentType.VIDEO | ContentType.ANIMATION)
+@router.message(content_types=[ContentType.PHOTO, ContentType.VIDEO, ContentType.ANIMATION])
 async def process_message(message: types.Message):
     try:
         # Check if the message has a caption
