@@ -114,41 +114,49 @@ async def cmd_make_post(message: types.Message):
     # Ask the user to provide the post content
     await message.answer("Please send the content of your post.")
 
-# Inside the message handler for confirming or canceling the post
-@router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "confirming_post")
-async def process_post_confirmation(message: types.Message):
+# Inside the message handler for receiving the post content
+@router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "making_post")
+async def process_post_content(message: types.Message):
     try:
-        if message.text == "✅ Confirm":
-            # Retrieve the post content from the user's input dictionary
-            post_content = user_input_dict.get(message.from_user.id, {}).get("post_content")
+        logging.info("Received post content message.")
+        # Check if the message contains any media
+        has_media = bool(message.photo or message.video or message.animation)
 
-            if post_content:
-                # Retrieve the connected chat ID from the user's information
-                user_info = await db.users.find_one({"user_id": message.from_user.id})
-                connected_chat = user_info.get("connected_chat")
+        # Format the post content with media, caption, and inline buttons if present
+        formatted_content = ""
 
-                if connected_chat:
-                    # Post the message in the connected chat
-                    try:
-                        await message.bot.send_message(chat_id=connected_chat, text=post_content, parse_mode=ParseMode.MARKDOWN)
-                        await message.answer("Message posted successfully!")
-                    except Exception as e:
-                        await message.answer(f"Error posting message: {e}")
-                else:
-                    await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
-            else:
-                await message.answer("No post content found. Please provide content for your post.")
+        # Add media and caption if present
+        if has_media:
+            media_caption = ""
+            if message.caption:
+                media_caption = f"{message.caption}\n"
+            formatted_content += f"{media_caption}[Media attached]"
 
-            # Reset the user's state
-            user_input_dict[message.from_user.id]["state"] = "main_menu"
-        elif message.text == "❌ Cancel":
-            # Cancel the post and reset the user's state
-            user_input_dict[message.from_user.id]["state"] = "main_menu"
-            await message.answer("Post canceled.")
+        # Add inline buttons if present
+        if message.entities:
+            inline_buttons = []
+            for entity in message.entities:
+                if entity.type == "url":
+                    inline_buttons.append(f"[{message.text[entity.offset:entity.offset+entity.length]}]({entity.url})")
+            if inline_buttons:
+                formatted_content += "\n\n" + "\n".join(inline_buttons)
+
+        # Save the formatted post content
+        user_input_dict[message.from_user.id]["post_content"] = formatted_content
+
+        # Ask the user to confirm the post
+        keyboard = ReplyKeyboardMarkup(
+            keyboard=[[KeyboardButton(text="✅ Confirm"), KeyboardButton(text="❌ Cancel")]],
+            resize_keyboard=True,
+        )
+        await message.answer("Post content:\n" + formatted_content + "\n\nDo you want to post this?", reply_markup=keyboard)
+
+        # Update the user's state to indicate they are confirming the post
+        user_input_dict[message.from_user.id]["state"] = "confirming_post"
     except Exception as e:
-        # Log any errors that occur during post confirmation
-        logging.exception("Error processing post confirmation: %s", e)
-        await message.answer("An error occurred while processing your post confirmation. Please try again later.")
+        # Log any errors that occur during message processing
+        logging.exception("Error processing post content: %s", e)
+        await message.answer("An error occurred while processing your post content. Please try again later.")
 
 # Inside the message handler for canceling the post
 @router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "making_post" and message.text == "❌ Cancel")
