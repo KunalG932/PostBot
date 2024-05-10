@@ -10,7 +10,7 @@ from aiogram.filters import Command
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
-from aiogram.contrib.middlewares.logging import LoggingMiddleware
+import logging
 from constants import *
 from db import *
 from aiogram.fsm.state import State, StatesGroup
