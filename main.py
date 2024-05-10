@@ -10,15 +10,17 @@ from aiogram.filters import Command
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
+from aiogram.contrib.middlewares.logging import LoggingMiddleware
 from constants import *
 from db import *
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
-from aiogram.enums.content_type import  ContentType
+from aiogram.enums.content_type import ContentType
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-
 user_input_dict = {}
+
+logging.basicConfig(level=logging.INFO)
 
 # Set the event loop policy to uvloop
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
@@ -105,73 +107,75 @@ async def cmd_chat(message: types.Message):
         reply_markup=keyboard,
     )
 
-# Inside the message handler for selecting "Make Post"
+# Message handler for processing incoming messages
+@router.message(content_types=ContentType.PHOTO | ContentType.VIDEO | ContentType.ANIMATION)
+async def process_message(message: types.Message):
+    try:
+        # Check if the message has a caption
+        if message.caption:
+            # Extract media caption
+            media_caption = message.caption
+
+            # Extract entities from caption
+            entities = message.caption_entities
+
+            # Initialize variables for formatted content
+            formatted_content = media_caption
+
+            # Check if message has entities
+            if entities:
+                inline_buttons = []
+
+                # Process each entity
+                for entity in entities:
+                    # Check if entity is URL type
+                    if entity.type == 'url':
+                        # Extract URL and add to inline buttons
+                        inline_buttons.append(f"[{media_caption[entity.offset:entity.offset+entity.length]}]({entity.url})")
+
+                # Concatenate inline buttons with formatted content
+                if inline_buttons:
+                    formatted_content += '\n\n' + '\n'.join(inline_buttons)
+
+            # Save formatted content in user input dictionary
+            user_input_dict[message.from_user.id] = formatted_content
+
+            # Send confirmation message
+            keyboard = ReplyKeyboardMarkup(resize_keyboard=True).add(KeyboardButton("✅ Confirm"))
+            await message.answer(f"Post content:\n{formatted_content}\n\nDo you want to post this?", reply_markup=keyboard)
+        else:
+            await message.answer("Please provide a caption for the media.")
+    except Exception as e:
+        logging.exception(f"Error processing message: {e}")
+        await message.answer("An error occurred while processing your message. Please try again later.")
+
+# Message handler for confirming the post
+@router.message(Text(equals="✅ Confirm"))
+async def confirm_post(message: types.Message):
+    try:
+        # Retrieve user's connected chat
+        user_info = await db.users.find_one({"user_id": message.from_user.id})
+        connected_chat = user_info.get("connected_chat")
+
+        # Retrieve post content from user input dictionary
+        post_content = user_input_dict.get(message.from_user.id)
+
+        if connected_chat and post_content:
+            # Send post content to connected chat
+            await bot.send_message(chat_id=connected_chat, text=post_content)
+            await message.answer("Post sent successfully!")
+            del user_input_dict[message.from_user.id]  # Remove user's data from input dictionary
+        else:
+            await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
+    except Exception as e:
+        logging.exception(f"Error confirming post: {e}")
+        await message.answer("An error occurred while confirming your post. Please try again later.")
+
+# Inside the message handler for the "Make Post" button
 @router.message(lambda message: message.text == "Make Post")
 async def cmd_make_post(message: types.Message):
-    try:
-        # Set the user's state to indicate they are making a post
-        user_input_dict[message.from_user.id] = {"state": "making_post"}
-
-        # Ask the user to provide the post content
-        await message.answer("Please send the content of your post.")
-        logging.info("Asking user to provide post content.")
-    except Exception as e:
-        # Log any errors that occur during message processing
-        logging.exception("Error processing Make Post command: %s", e)
-        await message.answer("An error occurred while processing your request. Please try again later.")
-
-# Inside the message handler for confirming or canceling the post
-@router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "confirming_post")
-async def process_post_confirmation(message: types.Message):
-    try:
-        logging.info("Received post confirmation message.")
-        if message.text == "✅ Confirm":
-            logging.info("User confirmed the post.")
-
-            # Retrieve the post content from the user's input dictionary
-            post_content = user_input_dict.get(message.from_user.id, {}).get("post_content")
-
-            if post_content:
-                logging.info("Posting message to connected chat.")
-
-                # Retrieve the connected chat ID from the user's information
-                user_info = await db.users.find_one({"user_id": message.from_user.id})
-                connected_chat = user_info.get("connected_chat")
-
-                if connected_chat:
-                    # Post the message in the connected chat
-                    try:
-                        await message.bot.send_message(chat_id=connected_chat, text=post_content, parse_mode=ParseMode.MARKDOWN)
-                        await message.answer("Message posted successfully!")
-                        logging.info("Message posted successfully to connected chat.")
-                    except Exception as e:
-                        await message.answer(f"Error posting message: {e}")
-                        logging.error("Error posting message: %s", e)
-                else:
-                    await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
-                    logging.warning("User is not connected to any chat.")
-            else:
-                await message.answer("No post content found. Please provide content for your post.")
-                logging.warning("No post content found.")
-
-            # Reset the user's state
-            user_input_dict[message.from_user.id]["state"] = "main_menu"
-        elif message.text == "❌ Cancel":
-            # Cancel the post and reset the user's state
-            user_input_dict[message.from_user.id]["state"] = "main_menu"
-            await message.answer("Post canceled.")
-            logging.info("Post canceled.")
-    except Exception as e:
-        # Log any errors that occur during post confirmation
-        logging.exception("Error processing post confirmation: %s", e)
-        await message.answer("An error occurred while processing your post confirmation. Please try again later.")
-
-# Inside the message handler for canceling the post
-@router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "making_post" and message.text == "❌ Cancel")
-async def cancel_post(message: types.Message):
-    # Reset the user's state
-    user_input_dict[message.from_user.id]["state"] = "main_menu"
-    await message.answer("Post canceled.")
+    # Ask the user to send the content they want to post
+    await message.answer("Please send the content you want to post. This can include text, media, and inline formatted text.")
 
 @router.message(lambda message: message.text == "Clone")
 async def cmd_clone(message: types.Message):
