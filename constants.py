@@ -1,8 +1,7 @@
 # router.py
 
-from aiogram import Router
-from aiogram import Dispatcher
-      
+from aiogram import Dispatcher, Router
+
 router = Router()
 
 dp = Dispatcher()
