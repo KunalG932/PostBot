@@ -34,6 +34,7 @@ async def cmd_start(message: types.Message):
         f"Hello, <b>{message.from_user.full_name}!</b>\n"
         "You can use the following options:",
         reply_markup=keyboard,
+        parse_mode=ParseMode.HTML,
     )
 
     await db.users.update_one(
