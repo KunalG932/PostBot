@@ -1,15 +1,13 @@
 import asyncio
 import logging
-
-import uvloop  # Import uvloop
+import uvloop
 from aiogram import Bot, Dispatcher, Router, types
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
-
 from constants import CHANNEL_ID, TOKEN
-from db import db, mongo_client  # Importing the necessary database modules
+from db import db, mongo_client
 
 # Initialize the Router
 router = Router()
@@ -18,7 +16,6 @@ router = Router()
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 user_input_dict = {}
-
 
 @router.message(Command("start"))
 async def cmd_start(message: types.Message):
@@ -31,10 +28,9 @@ async def cmd_start(message: types.Message):
     )
 
     await message.answer(
-        f"Hello, <b>{message.from_user.full_name} !</b>\n"
+        f"Hello, <b>{message.from_user.full_name}!</b>\n"
         "You can use the following options:",
         reply_markup=keyboard,
-        parse_mode=ParseMode.HTML,
     )
 
     await db.users.update_one(
@@ -42,7 +38,6 @@ async def cmd_start(message: types.Message):
         {"$set": {"user_id": message.from_user.id}},
         upsert=True,
     )
-
 
 @router.message(lambda message: message.text == "🌟 Create Post 🌟")
 async def cmd_create_post(message: types.Message):
@@ -63,7 +58,6 @@ async def cmd_create_post(message: types.Message):
         reply_markup=keyboard,
     )
 
-
 @router.message(lambda message: message.text == "🔙 Back")
 async def cmd_back(message: types.Message):
     user_input_dict.get(message.from_user.id, {})["state"] = "main_menu"
@@ -80,15 +74,12 @@ async def cmd_back(message: types.Message):
         f"Hello, <b>{message.from_user.full_name}!</b>\n"
         "You can use the following options:",
         reply_markup=keyboard,
-        parse_mode=ParseMode.HTML,
     )
-
 
 @router.message(Command("stats"))
 async def cmd_stats(message: types.Message):
     total_users = await db.users.count_documents({})
     await message.reply(f"Total users: {total_users}")
-
 
 @router.message(lambda message: message.text == "Chat")
 async def cmd_chat(message: types.Message):
@@ -105,7 +96,6 @@ async def cmd_chat(message: types.Message):
         reply_markup=keyboard,
     )
 
-
 @router.message(lambda message: message.text == "Clone")
 async def cmd_clone(message: types.Message):
     keyboard = ReplyKeyboardMarkup(
@@ -121,28 +111,20 @@ async def cmd_clone(message: types.Message):
         reply_markup=keyboard,
     )
 
-
 @router.message(lambda message: message.text == "Normal Clone")
 async def cmd_normal_clone(message: types.Message):
     user_input_dict.setdefault(message.from_user.id, {})["state"] = "normal_cloning"
     await message.answer("Please send the message you want to clone.")
 
-
 @router.message(lambda message: message.text == "Forward Clone")
 async def cmd_forward_clone(message: types.Message):
     try:
-        user_input_dict.setdefault(message.from_user.id, {})[
-            "state"
-        ] = "forward_cloning"
+        user_input_dict.setdefault(message.from_user.id, {})["state"] = "forward_cloning"
         await message.answer("Please send the message you want to clone.")
     except Exception as e:
         await message.answer(f"Error initiating forward clone: {e}")
 
-
-@router.message(
-    lambda message: user_input_dict.get(message.from_user.id, {}).get("state")
-    == "forward_cloning"
-)
+@router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "forward_cloning")
 async def process_forward_clone_message(message: types.Message):
     try:
         user_info = await db.users.find_one({"user_id": message.from_user.id})
@@ -160,11 +142,7 @@ async def process_forward_clone_message(message: types.Message):
 
     user_input_dict.get(message.from_user.id, {})["state"] = "main_menu"
 
-
-@router.message(
-    lambda message: user_input_dict.get(message.from_user.id, {}).get("state")
-    == "normal_cloning"
-)
+@router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "normal_cloning")
 async def process_normal_clone_message(message: types.Message):
     try:
         user_info = await db.users.find_one({"user_id": message.from_user.id})
@@ -184,22 +162,18 @@ async def process_normal_clone_message(message: types.Message):
 
     user_input_dict.get(message.from_user.id, {})["state"] = "main_menu"
 
-
 @router.message(lambda message: message.text == "Connect")
 async def cmd_connect(message: types.Message):
     await message.answer(
-        "Use command /connect username or chat ID of the channel to connect.\n Example: /connect @ProjectCodeXsupport or /connect -1001511142636"
+        "Use command /connect username or chat ID of the channel to connect.\nExample: /connect @ProjectCodeXsupport or /connect -1001511142636"
     )
-
 
 @router.message(Command("connect"))
 async def cmd_connect(message: types.Message):
     command_args = message.text.split(maxsplit=1)
 
     if len(command_args) < 2:
-        await message.reply(
-            "Please provide the username or chat ID of the channel to connect."
-        )
+        await message.reply("Please provide the username or chat ID of the channel to connect.")
         return
 
     channel_identifier = command_args[1].strip()
@@ -211,8 +185,8 @@ async def cmd_connect(message: types.Message):
 
     try:
         chat_info = await message.bot.get_chat(chat_id)
-
         bot_member = await message.bot.get_chat_member(chat_id, message.bot.id)
+
         if not bot_member.status in ["administrator", "creator"]:
             await message.reply(
                 "Bot must be an admin in the chat to connect. Please promote the bot and try again."
@@ -238,7 +212,6 @@ async def cmd_connect(message: types.Message):
 
     await message.reply(f"You have successfully connected to the chat: {chat_id}")
 
-
 async def get_chat_usernames(user_id):
     user_info = await db.users.find_one({"user_id": user_id})
 
@@ -255,7 +228,6 @@ async def get_chat_usernames(user_id):
                     return [chat_username]
 
     return []
-
 
 @router.message(lambda message: message.text == "Connected")
 async def cmd_connected_from_chat(message: types.Message):
@@ -289,7 +261,6 @@ async def cmd_connected_from_chat(message: types.Message):
             "You are not currently connected to any chat. Use /connect to connect to a chat."
         )
 
-
 @router.message(lambda message: message.text == "Disconnect")
 async def cmd_disconnect(message: types.Message):
     await db.users.update_one(
@@ -307,7 +278,6 @@ async def cmd_disconnect(message: types.Message):
         reply_markup=keyboard,
     )
 
-
 async def main() -> None:
     logging.basicConfig(level=logging.INFO)
 
@@ -320,7 +290,6 @@ async def main() -> None:
 
     await dp.start_polling(bot)
     await bot.send_message(chat_id=CHANNEL_ID, text="Bot is now alive!")
-
 
 if __name__ == "__main__":
     asyncio.run(main())
