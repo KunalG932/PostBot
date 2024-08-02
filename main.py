@@ -1,24 +1,23 @@
 # cloning
-import logging
 import asyncio
-import uvloop  # Import uvloop
-import aiogram
+import logging
 
-from aiogram import Router
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
-from aiogram.enums import ParseMode
+import aiogram
+import uvloop  # Import uvloop
+from aiogram import Bot, types
 from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+from aiogram.filters import Command
+from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
+
 from constants import *
 from db import *
-from aiogram.fsm.state import State, StatesGroup
-from aiogram.fsm.context import FSMContext
 
 user_input_dict = {}
 
 # Set the event loop policy to uvloop
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+
 
 @router.message(Command("start"))
 async def cmd_start(message: types.Message):
@@ -26,7 +25,7 @@ async def cmd_start(message: types.Message):
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="🌟 Create Post 🌟")],
-            [KeyboardButton(text="Chat")]
+            [KeyboardButton(text="Chat")],
         ],
         resize_keyboard=True,
     )
@@ -36,23 +35,28 @@ async def cmd_start(message: types.Message):
         f"Hello, <b>{message.from_user.full_name} !</b>\n"
         "You can use the following options:",
         reply_markup=keyboard,
-        parse_mode=ParseMode.HTML
+        parse_mode=ParseMode.HTML,
     )
 
     # Update user information in the MongoDB database
     await db.users.update_one(
         {"user_id": message.from_user.id},
         {"$set": {"user_id": message.from_user.id}},
-        upsert=True
+        upsert=True,
     )
+
 
 @router.message(lambda message: message.text == "🌟 Create Post 🌟")
 async def cmd_create_post(message: types.Message):
     # Create a new keyboard with options: Text, Media, Back
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="Text"), KeyboardButton(text="Clone"), KeyboardButton(text="Quote")],
-            [KeyboardButton(text="🔙 Back")]
+            [
+                KeyboardButton(text="Text"),
+                KeyboardButton(text="Clone"),
+                KeyboardButton(text="Quote"),
+            ],
+            [KeyboardButton(text="🔙 Back")],
         ],
         resize_keyboard=True,
     )
@@ -62,6 +66,7 @@ async def cmd_create_post(message: types.Message):
         "Choose an option to create a post:",
         reply_markup=keyboard,
     )
+
 
 # Inside the message handler for the "Back" button
 @router.message(lambda message: message.text == "🔙 Back")
@@ -73,17 +78,25 @@ async def cmd_back(message: types.Message):
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="🌟 Create Post 🌟")],
-            [KeyboardButton(text="Chat")]
+            [KeyboardButton(text="Chat")],
         ],
         resize_keyboard=True,
     )
 
-    await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
+    await message.answer(
+        "Hello, <b>{}</b> !\nYou can use the following options:".format(
+            message.from_user.full_name
+        ),
+        reply_markup=keyboard,
+        parse_mode=ParseMode.HTML,
+    )
+
 
 @router.message(Command("stats"))
 async def cmd_stats(message: types.Message):
     total_users = await db.users.count_documents({})
     await message.reply(f"Total users: {total_users}")
+
 
 # Add a handler for processing the provided chat ID or username and connecting
 # Handler for the "Chat" button
@@ -92,7 +105,7 @@ async def cmd_chat(message: types.Message):
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="Connect"), KeyboardButton(text="Connected")],
-            [KeyboardButton(text="🔙 Back")]
+            [KeyboardButton(text="🔙 Back")],
         ],
         resize_keyboard=True,
     )
@@ -102,6 +115,7 @@ async def cmd_chat(message: types.Message):
         reply_markup=keyboard,
     )
 
+
 @router.message(lambda message: message.text == "Text")
 async def cmd_text_input(message: types.Message):
     # Ask for text input
@@ -110,7 +124,11 @@ async def cmd_text_input(message: types.Message):
     # Store the user's ID as the key and initialize an empty string as the value
     user_input_dict[message.from_user.id] = ""
 
-@router.message(lambda message: message.from_user.id in user_input_dict and user_input_dict[message.from_user.id] == "")
+
+@router.message(
+    lambda message: message.from_user.id in user_input_dict
+    and user_input_dict[message.from_user.id] == ""
+)
 async def process_text_input(message: types.Message):
     # Retrieve the text input from the message
     post_text = message.text
@@ -124,7 +142,11 @@ async def process_text_input(message: types.Message):
         resize_keyboard=True,
     )
 
-    await message.answer("Text saved! Click the 'POST' button to post it in the connected chat or click 'CANCEL' to cancel the post.", reply_markup=keyboard)
+    await message.answer(
+        "Text saved! Click the 'POST' button to post it in the connected chat or click 'CANCEL' to cancel the post.",
+        reply_markup=keyboard,
+    )
+
 
 @router.message(lambda message: message.text in ["📬 POST", "🚫 CANCEL"])
 async def cmd_post_cancel(message: types.Message):
@@ -140,18 +162,24 @@ async def cmd_post_cancel(message: types.Message):
             if connected_chat:
                 # Post the message in the connected chat
                 try:
-                    await message.bot.send_message(chat_id=connected_chat, text=post_text)
+                    await message.bot.send_message(
+                        chat_id=connected_chat, text=post_text
+                    )
                     await message.answer("Message posted successfully!")
                 except Exception as e:
                     await message.answer(f"Error posting message: {e}")
             else:
-                await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
+                await message.answer(
+                    "You are not currently connected to any chat. Use /connect to connect to a chat."
+                )
         else:
-            await message.answer("No text found. Please use the 'Text' option to provide a text message first.")
+            await message.answer(
+                "No text found. Please use the 'Text' option to provide a text message first."
+            )
 
         # Remove the user's ID from the dictionary
         del user_input_dict[message.from_user.id]
-    
+
     # Optionally, you can provide a response for the "CANCEL" action
     if message.text == "🚫 CANCEL":
         await message.answer("Post canceled!")
@@ -162,12 +190,19 @@ async def cmd_post_cancel(message: types.Message):
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="🌟 Create Post 🌟")],
-            [KeyboardButton(text="Chat")]
+            [KeyboardButton(text="Chat")],
         ],
         resize_keyboard=True,
     )
 
-    await message.answer("Hello, <b>{}</b> !\nYou can use the following options:".format(message.from_user.full_name), reply_markup=keyboard, parse_mode=ParseMode.HTML)
+    await message.answer(
+        "Hello, <b>{}</b> !\nYou can use the following options:".format(
+            message.from_user.full_name
+        ),
+        reply_markup=keyboard,
+        parse_mode=ParseMode.HTML,
+    )
+
 
 # Inside the message handler for the "Clone" button
 # Inside the message handler for the "Clone" button
@@ -177,7 +212,7 @@ async def cmd_clone(message: types.Message):
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="Normal Clone"), KeyboardButton(text="Forward Clone")],
-            [KeyboardButton(text="🔙 Back")]
+            [KeyboardButton(text="🔙 Back")],
         ],
         resize_keyboard=True,
     )
@@ -186,6 +221,7 @@ async def cmd_clone(message: types.Message):
         "Choose an option for cloning:",
         reply_markup=keyboard,
     )
+
 
 # Inside the message handler for selecting "Normal Clone"
 @router.message(lambda message: message.text == "Normal Clone")
@@ -196,12 +232,15 @@ async def cmd_normal_clone(message: types.Message):
     # Ask for the message to clone
     await message.answer("Please send the message you want to clone.")
 
+
 # Inside the message handler for selecting "Forward Clone"
 @router.message(lambda message: message.text == "Forward Clone")
 async def cmd_forward_clone(message: types.Message):
     try:
         # Set the cloning state for the user
-        user_input_dict.setdefault(message.from_user.id, {})["state"] = "forward_cloning"
+        user_input_dict.setdefault(message.from_user.id, {})[
+            "state"
+        ] = "forward_cloning"
 
         # Send a message asking the user to provide the message they want to clone
         await message.answer("Please send the message you want to clone.")
@@ -209,8 +248,12 @@ async def cmd_forward_clone(message: types.Message):
     except Exception as e:
         await message.answer(f"Error initiating forward clone: {e}")
 
+
 # Inside the message handler for receiving the message to clone (forward clone)
-@router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "forward_cloning")
+@router.message(
+    lambda message: user_input_dict.get(message.from_user.id, {}).get("state")
+    == "forward_cloning"
+)
 async def process_forward_clone_message(message: types.Message):
     try:
         # Retrieve the connected chat from the user's information
@@ -222,15 +265,21 @@ async def process_forward_clone_message(message: types.Message):
             await message.forward(chat_id=connected_chat)
             await message.answer("Message forwarded successfully!")
         else:
-            await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
+            await message.answer(
+                "You are not currently connected to any chat. Use /connect to connect to a chat."
+            )
     except Exception as e:
         await message.answer(f"Error forwarding message: {e}")
 
     # Reset the state for the user
     user_input_dict.get(message.from_user.id, {})["state"] = "main_menu"
 
+
 # Inside the message handler for receiving the message to clone
-@router.message(lambda message: user_input_dict.get(message.from_user.id, {}).get("state") == "normal_cloning")
+@router.message(
+    lambda message: user_input_dict.get(message.from_user.id, {}).get("state")
+    == "normal_cloning"
+)
 async def process_normal_clone_message(message: types.Message):
     try:
         # Retrieve the connected chat from the user's information
@@ -239,15 +288,20 @@ async def process_normal_clone_message(message: types.Message):
 
         if connected_chat:
             # Clone the message with reply markup (including inline buttons)
-            cloned_message = await message.copy_to(chat_id=connected_chat, reply_markup=message.reply_markup)
+            cloned_message = await message.copy_to(
+                chat_id=connected_chat, reply_markup=message.reply_markup
+            )
             await message.answer("Message cloned and sent successfully!")
         else:
-            await message.answer("You are not currently connected to any chat. Use /connect to connect to a chat.")
+            await message.answer(
+                "You are not currently connected to any chat. Use /connect to connect to a chat."
+            )
     except Exception as e:
         await message.answer(f"Error cloning message: {e}")
 
     # Reset the state for the user
     user_input_dict.get(message.from_user.id, {})["state"] = "main_menu"
+
 
 @router.message(lambda message: message.text == "🌟 Create Post 🌟")
 async def cmd_create_post(message: types.Message):
@@ -258,7 +312,7 @@ async def cmd_create_post(message: types.Message):
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="🌟 Create Post 🌟")],
-            [KeyboardButton(text="Chat")]
+            [KeyboardButton(text="Chat")],
         ],
         resize_keyboard=True,
     )
@@ -268,12 +322,16 @@ async def cmd_create_post(message: types.Message):
         f"Hello, <b>{message.from_user.full_name} !</b>\n"
         "You can use the following options:",
         reply_markup=keyboard,
-        parse_mode=ParseMode.HTML
+        parse_mode=ParseMode.HTML,
     )
+
 
 @router.message(lambda message: message.text == "Connect")
 async def cmd_connect(message: types.Message):
-    await message.answer("use command /connect username or chat ID of the channel to connect.\n Example: /connect @ProjectCodeXsupport or /connect -1001511142636")
+    await message.answer(
+        "use command /connect username or chat ID of the channel to connect.\n Example: /connect @ProjectCodeXsupport or /connect -1001511142636"
+    )
+
 
 @router.message(Command("connect"))
 async def cmd_connect(message: types.Message):
@@ -281,7 +339,9 @@ async def cmd_connect(message: types.Message):
     command_args = message.text.split(maxsplit=1)
 
     if len(command_args) < 2:
-        await message.reply("Please provide the username or chat ID of the channel to connect.")
+        await message.reply(
+            "Please provide the username or chat ID of the channel to connect."
+        )
         return
 
     # Extract the channel username or chat ID from the command arguments
@@ -300,12 +360,16 @@ async def cmd_connect(message: types.Message):
 
         # Check if the bot is an administrator in the chat
         bot_member = await message.bot.get_chat_member(chat_id, message.bot.id)
-        if not bot_member.status in ['administrator', 'creator']:
-            await message.reply("Bot must be an admin in the chat to connect. Please promote the bot and try again.")
+        if not bot_member.status in ["administrator", "creator"]:
+            await message.reply(
+                "Bot must be an admin in the chat to connect. Please promote the bot and try again."
+            )
             return
     except aiogram.exceptions.TelegramBadRequest as e:
         if "chat not found" in str(e).lower():
-            await message.reply("Chat not found. Please make sure the chat exists and the bot has access to it.")
+            await message.reply(
+                "Chat not found. Please make sure the chat exists and the bot has access to it."
+            )
         else:
             await message.reply(f"An error occurred: {e}")
         return
@@ -317,10 +381,11 @@ async def cmd_connect(message: types.Message):
     await db.users.update_one(
         {"user_id": message.from_user.id},
         {"$set": {"connected_chat": chat_id}},
-        upsert=True
+        upsert=True,
     )
 
     await message.reply(f"You have successfully connected to the chat: {chat_id}")
+
 
 async def get_chat_usernames(user_id):
     # Retrieve connected chat from the user's information
@@ -342,6 +407,7 @@ async def get_chat_usernames(user_id):
 
     return []
 
+
 @router.message(lambda message: message.text == "Connected")
 async def cmd_connected_from_chat(message: types.Message):
     # Retrieve connected chat from the user's information
@@ -356,18 +422,27 @@ async def cmd_connected_from_chat(message: types.Message):
 
             # Create a keyboard with chat usernames and disconnect option
             keyboard = ReplyKeyboardMarkup(
-                keyboard=[[KeyboardButton(text=username) for username in chat_usernames],
-                          [KeyboardButton(text="Disconnect")],
-                          [KeyboardButton(text="🔙 Back")]],
+                keyboard=[
+                    [KeyboardButton(text=username) for username in chat_usernames],
+                    [KeyboardButton(text="Disconnect")],
+                    [KeyboardButton(text="🔙 Back")],
+                ],
                 resize_keyboard=True,
             )
 
-            await message.reply("You are currently connected to the chat: {}".format(connected_chat),
-                                reply_markup=keyboard)
+            await message.reply(
+                "You are currently connected to the chat: {}".format(connected_chat),
+                reply_markup=keyboard,
+            )
         else:
-            await message.reply("You are not currently connected to any chat. Use /connect to connect to a chat.")
+            await message.reply(
+                "You are not currently connected to any chat. Use /connect to connect to a chat."
+            )
     else:
-        await message.reply("You are not currently connected to any chat. Use /connect to connect to a chat.")
+        await message.reply(
+            "You are not currently connected to any chat. Use /connect to connect to a chat."
+        )
+
 
 @router.message(lambda message: message.text == "Disconnect")
 async def cmd_disconnect(message: types.Message):
@@ -383,8 +458,11 @@ async def cmd_disconnect(message: types.Message):
         resize_keyboard=True,
     )
 
-    await message.reply("You have successfully disconnected from the chat. You can go back to the main menu.",
-                        reply_markup=keyboard)
+    await message.reply(
+        "You have successfully disconnected from the chat. You can go back to the main menu.",
+        reply_markup=keyboard,
+    )
+
 
 async def main() -> None:
     logging.basicConfig(level=logging.INFO)
@@ -397,6 +475,7 @@ async def main() -> None:
 
     await dp.start_polling(bot)
     await bot.send_message(chat_id=CHANNEL_ID, text="Bot is now alive!")
+
 
 if __name__ == "__main__":
     asyncio.run(main())
