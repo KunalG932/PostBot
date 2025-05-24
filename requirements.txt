@@ -1,0 +1,4 @@
+aiogram
+motor
+aiohttp
+pymongo
