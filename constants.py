@@ -1,11 +1,20 @@
-# router.py
+# constants.py
+# Legacy constants file - migrated to config.py
+# This file is kept for backward compatibility
 
 from aiogram import Dispatcher, Router
+from config import Config
 
+# Router and dispatcher instances
 router = Router()
-
 dp = Dispatcher()
 
-TOKEN = "7697320028:AAEFPOpk-nAOYUDMwEaB71JGkIemQJwRlLk"
-CHANNEL_ID = -1002441166265
-MONGO_URI = "mongodb+srv://exp69:exp69@cluster0.kr93qbe.mongodb.net/?retryWrites=true&w=majority"
+# Legacy constants for backward compatibility
+# These are now sourced from Config class
+TOKEN = Config.BOT_TOKEN
+CHANNEL_ID = Config.CHANNEL_ID
+MONGO_URI = Config.MONGO_URI
+
+# Developer info (now in Config)
+DEVELOPER_USERNAME = Config.DEVELOPER_USERNAME
+DEVELOPER_CHANNEL = Config.DEVELOPER_CHANNEL

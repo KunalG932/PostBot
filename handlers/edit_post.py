@@ -11,6 +11,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMedia
 from constants import router
 from db import db
 from utils.data_store import get_user_data, set_user_data, clear_user_data
+from utils.keyboards import create_inline_buttons_keyboard
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -351,7 +352,8 @@ async def show_post_content_and_edit_options(message: types.Message, content: di
         content_text += "**🔗 Buttons:** _No buttons_\n\n"
     
     content_text += "**🛠️ What would you like to edit?**"
-      # Create edit options keyboard
+    
+    # Create edit options keyboard
     keyboard = []
     
     # Edit options
@@ -362,6 +364,20 @@ async def show_post_content_and_edit_options(message: types.Message, content: di
     
     keyboard.append([InlineKeyboardButton(text="🖼️ Edit Media", callback_data="edit_media")])
     keyboard.append([InlineKeyboardButton(text="🔗 Edit Buttons", callback_data="edit_buttons")])
+    
+    # Special section for posts without buttons - add quick action buttons
+    if not content.get("buttons"):
+        content_text += "\n\n💡 **This post has no buttons. Quick actions:**"
+        keyboard.append([
+            InlineKeyboardButton(text="➕ Add Button", callback_data="quick_add_button"),
+            InlineKeyboardButton(text="➕ Add Media", callback_data="quick_add_media")
+        ])
+        if not content.get("text"):
+            keyboard.append([InlineKeyboardButton(text="➕ Add Text", callback_data="quick_add_text")])
+    
+    # Separator line if quick actions were added
+    if not content.get("buttons"):
+        keyboard.append([InlineKeyboardButton(text="━━━━━━━━━━━━━━━━", callback_data="separator")])
     
     # Message actions
     keyboard.append([
@@ -1127,3 +1143,405 @@ async def handle_advanced_features(query: types.CallbackQuery):
             [InlineKeyboardButton(text="🔙 Back to More Options", callback_data="more_options")]
         ])
     )
+
+
+# Quick action handlers for posts without buttons
+@router.callback_query(lambda query: query.data == "quick_add_button")
+async def handle_quick_add_button(query: types.CallbackQuery):
+    """Quick add button action for posts without buttons"""
+    await query.answer()
+    
+    user_data = get_user_data(query.from_user.id)
+    user_data["state"] = "editing_buttons"
+    set_user_data(query.from_user.id, user_data)
+    
+    await query.message.edit_text(
+        f"🔗 **Quick Add Button**\n\n"
+        f"**No buttons currently in this post**\n\n"
+        f"**Send buttons in format:**\n"
+        f"`Text1 - URL1 | Text2 - URL2`\n\n"
+        f"**Example:**\n"
+        f"`Visit Website - https://example.com | Join Channel - https://t.me/channel`\n\n"
+        f"💡 **Tip:** Adding buttons makes your post more interactive!",
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔙 Back to Edit Menu", callback_data="back_to_edit_menu")]
+        ])
+    )
+
+
+@router.callback_query(lambda query: query.data == "quick_add_media")
+async def handle_quick_add_media(query: types.CallbackQuery):
+    """Quick add media action for posts without buttons"""
+    await query.answer()
+    
+    user_data = get_user_data(query.from_user.id)
+    current_media = user_data.get("media", [])
+    user_data["state"] = "editing_media"
+    set_user_data(query.from_user.id, user_data)
+    
+    media_info = f"**Current media:** {len(current_media)} file(s)" if current_media else "**No media currently**"
+    
+    await query.message.edit_text(
+        f"🖼️ **Quick Add Media**\n\n"
+        f"{media_info}\n\n"
+        f"📎 **Send new media files (photos, videos, documents):**\n"
+        f"You can send multiple files. Send /done when finished.\n\n"
+        f"💡 **Tip:** Media makes your posts more engaging and visual!",
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🗑️ Remove All Media", callback_data="remove_all_media")],
+            [InlineKeyboardButton(text="🔙 Back to Edit Menu", callback_data="back_to_edit_menu")]
+        ])
+    )
+
+
+@router.callback_query(lambda query: query.data == "quick_add_text")
+async def handle_quick_add_text(query: types.CallbackQuery):
+    """Quick add text action for posts without buttons and text"""
+    await query.answer()
+    
+    user_data = get_user_data(query.from_user.id)
+    user_data["state"] = "editing_text"
+    set_user_data(query.from_user.id, user_data)
+    
+    await query.message.edit_text(
+        f"✏️ **Quick Add Text**\n\n"
+        f"**No text currently in this post**\n\n"
+        f"📝 **Send the text content for your post:**\n\n"
+        f"💡 **Tip:** You can use HTML formatting:\n"
+        f"• `<b>bold</b>` for **bold text**\n"
+        f"• `<i>italic</i>` for *italic text*\n"
+        f"• `<code>code</code>` for `code text`\n"
+        f"• `<a href='url'>link text</a>` for links",
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔙 Back to Edit Menu", callback_data="back_to_edit_menu")]
+        ])
+    )
+
+
+@router.callback_query(lambda query: query.data == "separator")
+async def handle_separator_click(query: types.CallbackQuery):
+    """Handle separator line click (do nothing, just provide feedback)"""
+    await query.answer("This is just a visual separator", show_alert=False)
+
+
+# Message handlers for edit states
+@router.message(lambda message: 
+    get_user_data(message.from_user.id).get("state") == "editing_text" and
+    message.text and
+    message.text not in ["🔙 Back to Edit Menu"]
+)
+async def process_edit_text_input(message: types.Message):
+    """Process text input during edit mode"""
+    user_data = get_user_data(message.from_user.id)
+    user_data["text"] = message.text
+    user_data["state"] = "editing_post"
+    set_user_data(message.from_user.id, user_data)
+    
+    await message.answer(
+        f"✅ **Text Updated!**\n\n"
+        f"Preview: {message.text[:100]}{'...' if len(message.text) > 100 else ''}",
+        parse_mode=ParseMode.MARKDOWN
+    )
+    
+    # Go back to edit menu
+    selected_channel = user_data.get("selected_channel", {})
+    await show_post_content_and_edit_options(message, {
+        "text": user_data.get("text", ""),
+        "media": user_data.get("media", []),
+        "buttons": user_data.get("buttons", [])
+    }, selected_channel)
+
+
+@router.message(lambda message: 
+    get_user_data(message.from_user.id).get("state") == "editing_media" and
+    (message.photo or message.video or message.document or message.animation)
+)
+async def process_edit_media_input(message: types.Message):
+    """Process media input during edit mode"""
+    user_data = get_user_data(message.from_user.id)
+    media_item = None
+    
+    if message.photo:
+        # Get the largest photo size
+        largest_photo = max(message.photo, key=lambda x: x.file_size or 0)
+        media_item = {
+            "type": "photo",
+            "file_id": largest_photo.file_id,
+            "caption": message.caption or ""
+        }
+    elif message.video:
+        media_item = {
+            "type": "video",
+            "file_id": message.video.file_id,
+            "caption": message.caption or ""
+        }
+    elif message.document:
+        media_item = {
+            "type": "document",
+            "file_id": message.document.file_id,
+            "caption": message.caption or ""
+        }
+    elif message.animation:
+        media_item = {
+            "type": "animation",
+            "file_id": message.animation.file_id,
+            "caption": message.caption or ""
+        }
+    
+    if media_item:
+        user_data["media"].append(media_item)
+        set_user_data(message.from_user.id, user_data)
+        media_count = len(user_data["media"])
+        
+        await message.answer(
+            f"✅ **Media Added!**\n\n"
+            f"Total media files: {media_count}\n"
+            f"You can send more media or use the buttons below to continue.",
+            parse_mode=ParseMode.MARKDOWN
+        )
+
+
+@router.message(lambda message: 
+    get_user_data(message.from_user.id).get("state") == "editing_buttons" and
+    message.text and
+    message.text not in ["🔙 Back to Edit Menu"]
+)
+async def process_edit_buttons_input(message: types.Message):
+    """Process buttons input during edit mode"""
+    user_data = get_user_data(message.from_user.id)
+    text = message.text.strip()
+    
+    try:
+        # Parse the format: Button1 - URL1 | Button2 - URL2
+        button_pairs = text.split('|')
+        parsed_buttons = []
+        
+        for pair in button_pairs:
+            pair = pair.strip()
+            if ' - ' in pair:
+                button_text, url = pair.split(' - ', 1)
+                button_text = button_text.strip()
+                url = url.strip()
+                
+                # Basic URL validation
+                if not (url.startswith("http://") or url.startswith("https://")):
+                    url = "https://" + url
+                
+                # Validate URL format
+                import re
+                url_pattern = re.compile(
+                    r'^https?://'  # http:// or https://
+                    r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|'  # domain...
+                    r'localhost|'  # localhost...
+                    r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ...or ip
+                    r'(?::\d+)?'  # optional port
+                    r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+                
+                if url_pattern.match(url):
+                    parsed_buttons.append({
+                        "text": button_text,
+                        "url": url
+                    })
+                else:
+                    await message.answer(
+                        f"❌ **Invalid URL format for button:** {button_text}\n"
+                        f"URL: {url}\n\n"
+                        f"Please check the format and try again.",
+                        parse_mode=ParseMode.MARKDOWN
+                    )
+                    return
+            else:
+                await message.answer(
+                    f"❌ **Invalid format for:** {pair}\n\n"
+                    f"Use format: Button Text - URL\n"
+                    f"Example: Visit Site - https://example.com",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                return
+        
+        if parsed_buttons:
+            # Replace all buttons with new ones for edit mode
+            user_data["buttons"] = parsed_buttons
+            user_data["state"] = "editing_post"
+            set_user_data(message.from_user.id, user_data)
+            
+            buttons_summary = "\n".join([f"• {btn['text']} → {btn['url']}" for btn in parsed_buttons])
+            
+            await message.answer(
+                f"✅ **{len(parsed_buttons)} Button(s) Updated!**\n\n"
+                f"Updated buttons:\n{buttons_summary}",
+                parse_mode=ParseMode.MARKDOWN
+            )
+            
+            # Go back to edit menu
+            selected_channel = user_data.get("selected_channel", {})
+            await show_post_content_and_edit_options(message, {
+                "text": user_data.get("text", ""),
+                "media": user_data.get("media", []),
+                "buttons": user_data.get("buttons", [])
+            }, selected_channel)
+        else:
+            await message.answer(
+                "❌ **No valid buttons found**\n\n"
+                "Please check the format and try again.",
+                parse_mode=ParseMode.MARKDOWN
+            )
+    
+    except Exception as e:
+        await message.answer(
+            f"❌ **Error parsing buttons**\n\n"
+            f"Error: {str(e)}\n\n"
+            f"Please use the correct format:\n"
+            f"`Button1 - URL1 | Button2 - URL2`",
+            parse_mode=ParseMode.MARKDOWN
+        )
+
+
+@router.message(lambda message: 
+    get_user_data(message.from_user.id).get("state") == "editing_media" and
+    message.text == "/done"
+)
+async def handle_done_editing_media(message: types.Message):
+    """Handle done command for media editing"""
+    user_data = get_user_data(message.from_user.id)
+    user_data["state"] = "editing_post"
+    set_user_data(message.from_user.id, user_data)
+    
+    media_count = len(user_data.get("media", []))
+    await message.answer(
+        f"✅ **Media editing completed!**\n\n"
+        f"Total media files: {media_count}",
+        parse_mode=ParseMode.MARKDOWN
+    )
+    
+    # Go back to edit menu
+    selected_channel = user_data.get("selected_channel", {})
+    await show_post_content_and_edit_options(message, {
+        "text": user_data.get("text", ""),
+        "media": user_data.get("media", []),
+        "buttons": user_data.get("buttons", [])
+    }, selected_channel)
+
+
+async def update_channel_message(bot, chat_id: str, message_id: int, user_data: dict) -> bool:
+    """
+    Update an existing message in a channel with new content
+    
+    Args:
+        bot: The bot instance
+        chat_id: Channel chat ID (can be username or numeric ID)
+        message_id: Message ID to edit
+        user_data: User data containing the updated content
+        
+    Returns:
+        bool: True if update was successful, False otherwise
+    """
+    try:
+        # Validate user_data has content
+        has_text = user_data.get("text") and user_data["text"].strip()
+        has_media = user_data.get("media") and len(user_data["media"]) > 0
+        
+        if not has_text and not has_media:
+            logger.error("No content to update - both text and media are empty")
+            return False
+        
+        # Create inline keyboard for buttons if any
+        inline_keyboard = create_inline_buttons_keyboard(user_data.get("buttons", []))
+        
+        # Handle different content types
+        if has_media and len(user_data["media"]) == 1:
+            # Single media file - edit media message
+            media_item = user_data["media"][0]
+            caption_text = user_data.get("text", "")
+            
+            if media_item["type"] == "photo":
+                media = InputMediaPhoto(
+                    media=media_item["file_id"],
+                    caption=caption_text,
+                    parse_mode=ParseMode.HTML
+                )
+            elif media_item["type"] == "video":
+                media = InputMediaVideo(
+                    media=media_item["file_id"],
+                    caption=caption_text,
+                    parse_mode=ParseMode.HTML
+                )
+            elif media_item["type"] == "document":
+                media = InputMediaDocument(
+                    media=media_item["file_id"],
+                    caption=caption_text,
+                    parse_mode=ParseMode.HTML
+                )
+            elif media_item["type"] == "animation":
+                media = InputMediaAnimation(
+                    media=media_item["file_id"],
+                    caption=caption_text,
+                    parse_mode=ParseMode.HTML
+                )
+            else:
+                logger.error(f"Unsupported media type: {media_item['type']}")
+                return False
+            
+            # Edit media message
+            await bot.edit_message_media(
+                chat_id=chat_id,
+                message_id=message_id,
+                media=media,
+                reply_markup=inline_keyboard
+            )
+            
+        elif has_media and len(user_data["media"]) > 1:
+            # Multiple media files - cannot edit media group directly
+            # This is a limitation of Telegram API - media groups can't be edited
+            # We can only edit the caption of the first message in the group
+            text_content = user_data.get("text", "")
+            
+            try:
+                # Try to edit as if it's the first message of a media group
+                await bot.edit_message_caption(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    caption=text_content,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=inline_keyboard
+                )
+            except Exception as media_group_error:
+                logger.warning(f"Could not edit media group caption: {media_group_error}")
+                # Try to edit as text message instead
+                if text_content:
+                    await bot.edit_message_text(
+                        chat_id=chat_id,
+                        message_id=message_id,
+                        text=text_content,
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=inline_keyboard,
+                        disable_web_page_preview=not user_data.get("link_preview", True)
+                    )
+                else:
+                    logger.error("Cannot edit media group without text content")
+                    return False
+                    
+        else:
+            # Text only message
+            if not has_text:
+                logger.error("No text content to update")
+                return False
+                
+            await bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=user_data["text"],
+                parse_mode=ParseMode.HTML,
+                reply_markup=inline_keyboard,
+                disable_web_page_preview=not user_data.get("link_preview", True)
+            )
+        
+        logger.info(f"Successfully updated message {message_id} in chat {chat_id}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error updating channel message: {e}")
+        return False

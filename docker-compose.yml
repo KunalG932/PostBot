@@ -1,0 +1,96 @@
+version: '3.8'
+
+services:
+  postbot:
+    build: .
+    container_name: postbot
+    restart: unless-stopped
+    environment:
+      # Bot Configuration
+      - BOT_TOKEN=${BOT_TOKEN}
+      - MONGO_URI=mongodb://mongodb:27017/postbot
+      - DATABASE_NAME=postbot
+      
+      # Optional Configuration
+      - CHANNEL_ID=${CHANNEL_ID:-0}
+      - ADMIN_IDS=${ADMIN_IDS:-}
+      
+      # Bot Limits
+      - MAX_CHANNELS_PER_USER=${MAX_CHANNELS_PER_USER:-10}
+      - MAX_BUTTONS_PER_POST=${MAX_BUTTONS_PER_POST:-10}
+      - MAX_MEDIA_PER_POST=${MAX_MEDIA_PER_POST:-10}
+      
+      # Cache Settings
+      - CACHE_TTL=${CACHE_TTL:-3600}
+      
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FILE=postbot.log
+      
+      # Feature Flags
+      - ENABLE_ANALYTICS=${ENABLE_ANALYTICS:-true}
+      - ENABLE_BACKUP=${ENABLE_BACKUP:-true}
+      - ENABLE_NOTIFICATIONS=${ENABLE_NOTIFICATIONS:-true}
+      
+      # Rate Limiting
+      - RATE_LIMIT_REQUESTS=${RATE_LIMIT_REQUESTS:-30}
+      - RATE_LIMIT_WINDOW=${RATE_LIMIT_WINDOW:-60}
+      
+      # Backup Settings
+      - BACKUP_INTERVAL=${BACKUP_INTERVAL:-86400}
+      - BACKUP_RETENTION=${BACKUP_RETENTION:-7}
+    
+    volumes:
+      - ./logs:/app/logs
+      - ./backups:/app/backups
+      - .env:/app/.env:ro
+    
+    depends_on:
+      - mongodb
+    
+    networks:
+      - postbot-network
+
+  mongodb:
+    image: mongo:7.0
+    container_name: postbot-mongodb
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USERNAME:-admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:-password}
+      - MONGO_INITDB_DATABASE=postbot
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo-init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - postbot-network
+    ports:
+      - "27017:27017"
+
+  # Optional: MongoDB Express for database management
+  mongo-express:
+    image: mongo-express:1.0.0
+    container_name: postbot-mongo-express
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - ME_CONFIG_MONGODB_ADMINUSERNAME=${MONGO_ROOT_USERNAME:-admin}
+      - ME_CONFIG_MONGODB_ADMINPASSWORD=${MONGO_ROOT_PASSWORD:-password}
+      - ME_CONFIG_MONGODB_URL=mongodb://admin:password@mongodb:27017/
+      - ME_CONFIG_BASICAUTH_USERNAME=${MONGOEXPRESS_LOGIN:-admin}
+      - ME_CONFIG_BASICAUTH_PASSWORD=${MONGOEXPRESS_PASSWORD:-pass}
+    depends_on:
+      - mongodb
+    networks:
+      - postbot-network
+    profiles:
+      - debug
+
+volumes:
+  mongodb_data:
+    driver: local
+
+networks:
+  postbot-network:
+    driver: bridge

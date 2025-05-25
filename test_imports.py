@@ -21,7 +21,7 @@ def test_imports():
         
         # Test handlers imports
         from handlers import start, post_creation, buttons, media, text_input
-        from handlers import preview_publish, chat, clone_quote, stats, post_settings
+        from handlers import preview_publish, chat, stats, post_settings
         print("✅ All handlers imported successfully")
         
         print("\n🎉 All imports successful! The modular structure is working correctly.")

@@ -10,7 +10,6 @@ from . import (
     text_input,
     preview_publish,
     chat,
-    clone_quote,
     stats,
     connect,
     channel_selection,

@@ -4,11 +4,12 @@ Keyboard utility functions for creating common keyboards
 from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
 
 def get_main_menu_keyboard():
-    """Get the main menu keyboard"""
+    """Get the main menu keyboard with developer info"""
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="🌟 Create Post 🌟")],
             [KeyboardButton(text="✏️ Edit Post"), KeyboardButton(text="Chat")],
+            [KeyboardButton(text="👨‍💻 Developer Info")],
         ],
         resize_keyboard=True,
     )
@@ -20,7 +21,6 @@ def get_post_creation_keyboard():
             [KeyboardButton(text="📝 Add Text"), KeyboardButton(text="📷 Add Media")],
             [KeyboardButton(text="🔗 Add Buttons"), KeyboardButton(text="📌 Pin Post")],
             [KeyboardButton(text="🔔 Toggle Notifications"), KeyboardButton(text="🔗 Link Preview")],
-            [KeyboardButton(text="📋 Clone"), KeyboardButton(text="💬 Quote")],
             [KeyboardButton(text="👁️ Preview Post"), KeyboardButton(text="📤 Publish Post")],
             [KeyboardButton(text="🗑️ Clear All"), KeyboardButton(text="🔙 Back")]
         ],
@@ -60,16 +60,6 @@ def get_button_management_keyboard():
         keyboard=[
             [KeyboardButton(text="➕ Add New Button"), KeyboardButton(text="🗑️ Clear Buttons")],
             [KeyboardButton(text="📤 Send Message Format"), KeyboardButton(text="🔙 Back to Post Menu")]
-        ],
-        resize_keyboard=True,
-    )
-
-def get_clone_options_keyboard():
-    """Get keyboard for clone options"""
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="Normal Clone"), KeyboardButton(text="Forward Clone")],
-            [KeyboardButton(text="🔙 Back to Post Menu")],
         ],
         resize_keyboard=True,
     )
