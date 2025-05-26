@@ -157,12 +157,13 @@ async def cmd_publish_post(message: types.Message):
     print(f"DEBUG: media value: {user_data.get('media', 'NONE')}")
     
     if not has_text and not has_media:
+        media_count = len(user_data.get('media', []))
         await message.answer(
             "❌ **No Content to Publish**\n\n"
             "Please add some text or media before publishing your post.\n\n"
             "Current status:\n"
             f"• Text: {'Empty' if not has_text else 'Present'}\n"
-            f"• Media: {'None' if not has_media else f'{len(user_data.get('media', []))} files'}\n\n"
+            f"• Media: {'None' if not has_media else f'{media_count} files'}\n\n"
             f"Debug info:\n"
             f"• Raw text: '{user_data.get('text', 'NONE')}'\n"
             f"• Raw media: {user_data.get('media', 'NONE')}",
