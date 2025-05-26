@@ -24,7 +24,7 @@ class Config:
     CHANNEL_ID = int(os.getenv("CHANNEL_ID", "0"))
       # Developer info
     DEVELOPER_USERNAME = "DevIncognito"
-    DEVELOPER_CHANNEL = "@incognitobots"
+    DEVELOPER_CHANNEL = "@lncognitobots"
     GITHUB_REPO = "https://github.com/KunalG932/PostBot"
     
     # Bot limits
