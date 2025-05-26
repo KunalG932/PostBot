@@ -91,10 +91,28 @@ async def handle_single_channel_select(query: types.CallbackQuery):
         channel_index = int(query.data.split("_")[-1])
         await publish_to_channels(query.message, [channel_index], user_id=query.from_user.id)
     except (ValueError, IndexError):
-        await query.message.edit_text(
-            "❌ **Error**\n\nInvalid channel selection.",
-            parse_mode=ParseMode.MARKDOWN
-        )
+        try:
+            await query.message.edit_text(
+                "❌ **Error**\n\nInvalid channel selection.",
+                parse_mode=ParseMode.MARKDOWN
+            )
+        except Exception:
+            await query.message.answer(
+                "❌ **Error**\n\nInvalid channel selection.",
+                parse_mode=ParseMode.MARKDOWN
+            )
+    except Exception as e:
+        # Handle any other errors during publishing
+        try:
+            await query.message.edit_text(
+                f"❌ **Publishing Error**\n\n{str(e)}",
+                parse_mode=ParseMode.MARKDOWN
+            )
+        except Exception:
+            await query.message.answer(
+                f"❌ **Publishing Error**\n\n{str(e)}",
+                parse_mode=ParseMode.MARKDOWN
+            )
 
 
 @router.callback_query(lambda query: query.data == "select_all_channels")
@@ -102,19 +120,39 @@ async def handle_all_channels_select(query: types.CallbackQuery):
     """Handle all channels selection"""
     await query.answer()
     
-    user_info = await db.users.find_one({"user_id": query.from_user.id})
-    connected_channels = user_info.get("connected_channels", []) if user_info else []
+    try:
+        user_info = await db.users.find_one({"user_id": query.from_user.id})
+        connected_channels = user_info.get("connected_channels", []) if user_info else []
+        
+        if not connected_channels:
+            try:
+                await query.message.edit_text(
+                    "❌ **No Connected Channels**",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+            except Exception:
+                await query.message.answer(
+                    "❌ **No Connected Channels**",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+            return
+        
+        # Select all channels
+        channel_indices = list(range(len(connected_channels)))
+        await publish_to_channels(query.message, channel_indices, user_id=query.from_user.id)
     
-    if not connected_channels:
-        await query.message.edit_text(
-            "❌ **No Connected Channels**",
-            parse_mode=ParseMode.MARKDOWN
-        )
-        return
-    
-    # Select all channels
-    channel_indices = list(range(len(connected_channels)))
-    await publish_to_channels(query.message, channel_indices, user_id=query.from_user.id)
+    except Exception as e:
+        # Handle any errors during the process
+        try:
+            await query.message.edit_text(
+                f"❌ **Error**\n\n{str(e)}",
+                parse_mode=ParseMode.MARKDOWN
+            )
+        except Exception:
+            await query.message.answer(
+                f"❌ **Error**\n\n{str(e)}",
+                parse_mode=ParseMode.MARKDOWN
+            )
 
 
 @router.callback_query(lambda query: query.data == "multi_select_start")
@@ -307,7 +345,15 @@ async def publish_to_channels(message: types.Message, channel_indices, user_id=N
     else:
         status_text = f"📤 **Publishing to {len(selected_channels)} channels**\n\nYour post is being sent..."
     
-    await message.edit_text(status_text, parse_mode=ParseMode.MARKDOWN)
+    # Try to edit the message, if that fails, send a new message
+    try:
+        await message.edit_text(status_text, parse_mode=ParseMode.MARKDOWN)
+    except Exception as edit_error:
+        # If editing fails, send a new message
+        await message.answer(status_text, parse_mode=ParseMode.MARKDOWN)
+        # Update message reference for result display
+        message = await message.answer("Processing...")
+        await message.delete()
     
     # Publish to each selected channel
     success_count = 0
@@ -348,7 +394,12 @@ async def publish_to_channels(message: types.Message, channel_indices, user_id=N
             channel_name = failed["channel"].get("title", failed["channel"].get("username", "Unknown"))
             result_text += f"• {channel_name}: {failed['error'][:50]}...\n"
     
-    await message.edit_text(result_text, parse_mode=ParseMode.MARKDOWN)
+    # Show results with better error handling
+    try:
+        await message.edit_text(result_text, parse_mode=ParseMode.MARKDOWN)
+    except Exception as edit_error:
+        # If editing fails, send a new message
+        await message.answer(result_text, parse_mode=ParseMode.MARKDOWN)
     if success_count > 0:
         # Clear post data after successful publish
         from utils.data_store import clear_user_data
