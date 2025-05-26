@@ -16,4 +16,4 @@ psutil>=5.9.0
 python-dateutil>=2.8.0
 
 # Backup and logging
-bson>=0.5.10
+# bson>=0.5.10 # bson is part of pymongo, no nned to install separately
