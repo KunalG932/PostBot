@@ -162,7 +162,7 @@ async def cmd_publish_post(message: types.Message):
             "Please add some text or media before publishing your post.\n\n"
             "Current status:\n"
             f"• Text: {'Empty' if not has_text else 'Present'}\n"
-            f"• Media: {'None' if not has_media else f'{len(user_data.get("media", []))} files'}\n\n"
+            f"• Media: {'None' if not has_media else f'{len(user_data.get('media', []))} files'}\n\n"
             f"Debug info:\n"
             f"• Raw text: '{user_data.get('text', 'NONE')}'\n"
             f"• Raw media: {user_data.get('media', 'NONE')}",
