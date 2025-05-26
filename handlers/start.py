@@ -29,46 +29,21 @@ async def cmd_start(message: types.Message):
         ]
     ])
 
-    # Enhanced welcome message
+    # Simple welcome message
     welcome_text = (
-        f"🎉 **Welcome, {message.from_user.full_name}!** 🎉\n\n"
-        
-        f"🤖 **PostBot** - Your Advanced Channel Management Assistant\n\n"
-        
-        f"✨ **What I can do for you:**\n"
-        f"🌟 Create rich, professional posts with text, media & buttons\n"
-        f"📤 Publish to multiple channels simultaneously\n"
-        f"✏️ Edit existing posts with live preview\n"
-        f"🔗 Manage interactive buttons and links\n"
-        f"📷 Handle photos, videos, documents & media groups\n"
-        f"⚙️ Advanced settings: pin posts, notifications, link previews\n\n"
-        
-        f"🚀 **Quick Start:**\n"
-        f"1. Use `/connect @yourchannel` to link your channel\n"
-        f"2. Click '🌟 Create Post 🌟' to start\n"
-        f"3. Add content, preview, and publish!\n\n"
-        
-        f"💡 **Pro Tips:**\n"
-        f"• Use '✏️ Edit Post' to modify published content\n"
-        f"• Button format: `Text - URL | Text2 - URL2`\n"
-        f"• Preview before publishing for best results\n\n"
-        
-        f"🔧 **Need Help?**\n"
-        f"Join our updates channel or contact the developer below!"
+        f"👋 **Welcome, {message.from_user.full_name}!**\n\n"
+        f"🤖 **PostBot** - Create and publish posts to your channels\n\n"
+        f"🚀 **Getting Started:**\n"
+        f"1. Connect your channel with `/connect @yourchannel`\n"
+        f"2. Create and publish posts easily\n\n"
+        f"Choose an option below to continue:"
     )
 
-    # Send the enhanced welcome message
+    # Send the welcome message with main keyboard
     await message.answer(
         welcome_text,
         reply_markup=keyboard,
         parse_mode=ParseMode.MARKDOWN,
-    )
-    
-    # Send developer info with inline buttons
-    await message.answer(
-        "👨‍💻 **Developer & Support**",
-        reply_markup=inline_keyboard,
-        parse_mode=ParseMode.MARKDOWN
     )
 
     # Update user information in the MongoDB database
@@ -122,7 +97,7 @@ async def cmd_developer_info(message: types.Message):
         [
             InlineKeyboardButton(
                 text="⭐ Rate on GitHub", 
-                url="https://github.com/DevIncognito/postbot"
+                url="https://github.com/KunalG932/postbot"
             )
         ]
     ])
