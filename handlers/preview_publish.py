@@ -10,7 +10,7 @@ from db import db
 from utils.data_store import get_user_data, clear_user_data
 from utils.keyboards import create_inline_buttons_keyboard
 
-@router.message(lambda message: message.text == " Preview Post")
+@router.message(lambda message: message.text == "Preview Post")
 async def cmd_preview_post(message: types.Message):
     user_data = get_user_data(message.from_user.id)
     if not user_data:
@@ -30,7 +30,7 @@ async def cmd_preview_post(message: types.Message):
         return
     
     # Create preview
-    preview_text = " **POST PREVIEW** \n\n"
+    preview_text = "**POST PREVIEW**\n\n"
     
     if user_data.get("text"):
         preview_text += f"**Text:**\n{user_data['text']}\n\n"
@@ -114,7 +114,7 @@ async def cmd_preview_post(message: types.Message):
         
     except Exception as e:
         await message.answer(
-            f" **Preview Error**\n\n"
+            f"**Preview Error**\n\n"
             f"Failed to show preview: {str(e)}\n\n"
             "Please try again or check your media files.",
             parse_mode=ParseMode.MARKDOWN
@@ -122,7 +122,7 @@ async def cmd_preview_post(message: types.Message):
         from .post_menu import show_post_menu
         await show_post_menu(message)
 
-@router.message(lambda message: message.text == " Publish Post")
+@router.message(lambda message: message.text == "Publish Post")
 async def cmd_publish_post(message: types.Message):
     # Get user data and validate it exists
     user_data = get_user_data(message.from_user.id)
@@ -138,7 +138,7 @@ async def cmd_publish_post(message: types.Message):
     
     if not user_data:
         await message.answer(
-            " **No Post Data Found**\n\n"
+            "**No Post Data Found**\n\n"
             "Please create a post first using the menu options.",
             parse_mode=ParseMode.MARKDOWN
         )
@@ -159,7 +159,7 @@ async def cmd_publish_post(message: types.Message):
     if not has_text and not has_media:
         media_count = len(user_data.get('media', []))
         await message.answer(
-            " **No Content to Publish**\n\n"
+            "**No Content to Publish**\n\n"
             "Please add some text or media before publishing your post.\n\n"
             "Current status:\n"
             f"• Text: {'Empty' if not has_text else 'Present'}\n"
@@ -180,7 +180,7 @@ async def cmd_publish_post(message: types.Message):
         
         if not connected_channels:
             await message.answer(
-                " **No Connected Channels**\n\n"
+                "**No Connected Channels**\n\n"
                 "You need to connect to at least one channel first.\n"
                 "Use `/connect @channelname` to connect to a channel.",
                 parse_mode=ParseMode.MARKDOWN
@@ -195,7 +195,7 @@ async def cmd_publish_post(message: types.Message):
         
     except Exception as e:
         await message.answer(
-            f" **Database Error**\n\n"
+            f"**Database Error**\n\n"
             f"Failed to retrieve channel information: {str(e)}\n\n"
             "Please try again later.",
             parse_mode=ParseMode.MARKDOWN
@@ -286,7 +286,7 @@ async def publish_post_to_channel(message: types.Message, channel_data: dict, us
             if inline_keyboard:
                 await message.bot.send_message(
                     chat_id=connected_chat,
-                    text=" *Action buttons for the post above*",
+                    text="*Action buttons for the post above*",
                     reply_markup=inline_keyboard,
                     parse_mode=ParseMode.MARKDOWN,
                     disable_notification=not user_data.get("notifications", True)
