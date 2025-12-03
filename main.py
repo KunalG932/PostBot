@@ -1,8 +1,9 @@
 """
-Main bot file with modular imports
+Main bot file with modular imports and health check server
 """
 import asyncio
 import logging
+from aiohttp import web
 
 from aiogram import Bot
 from aiogram.client.default import DefaultBotProperties
@@ -31,6 +32,23 @@ from handlers import (
     admin  # Import admin handlers
 )
 
+# Health check server for Koyeb
+async def health_check(request):
+    """Health check endpoint for Koyeb"""
+    return web.Response(text="OK", status=200)
+
+async def start_health_server():
+    """Start health check HTTP server on port 8000"""
+    app = web.Application()
+    app.router.add_get('/', health_check)
+    app.router.add_get('/health', health_check)
+    
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 8000)
+    await site.start()
+    log_system_event("Health check server started on port 8000")
+
 async def main() -> None:
     # Validate configuration
     Config.validate()
@@ -45,6 +63,9 @@ async def main() -> None:
     # Test database connection
     await mongo_client.admin.command("ismaster")
     log_system_event("Database connection established")
+    
+    # Start health check server for Koyeb
+    asyncio.create_task(start_health_server())
     
     # Start scheduled backup task if enabled
     if Config.ENABLE_BACKUP:
