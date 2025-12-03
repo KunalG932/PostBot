@@ -65,7 +65,7 @@ async def show_channel_selection(message: types.Message, channels: list, is_call
             )
         ])
     
-    keyboard.append([InlineKeyboardButton(text=" Cancel", callback_data="cancel_edit")])
+    keyboard.append([InlineKeyboardButton(text="Cancel", callback_data="cancel_edit")])
     
     content = (
         " **Edit Post**\n\n"
@@ -142,8 +142,8 @@ async def show_post_link_request(message: types.Message, channel: dict, is_callb
     )
     
     markup = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=" Back to Channel Selection", callback_data="back_to_channel_selection")],
-        [InlineKeyboardButton(text=" Cancel", callback_data="cancel_edit")]
+        [InlineKeyboardButton(text="Back to Channel Selection", callback_data="back_to_channel_selection")],
+        [InlineKeyboardButton(text="Cancel", callback_data="cancel_edit")]
     ])
     
     if is_callback:
@@ -358,22 +358,22 @@ async def show_post_content_and_edit_options(message: types.Message, content: di
     
     # Edit options
     if content.get("text"):
-        keyboard.append([InlineKeyboardButton(text=" Edit Text", callback_data="edit_text")])
+        keyboard.append([InlineKeyboardButton(text="Edit Text", callback_data="edit_text")])
     else:
-        keyboard.append([InlineKeyboardButton(text=" Add Text", callback_data="edit_text")])
+        keyboard.append([InlineKeyboardButton(text="Add Text", callback_data="edit_text")])
     
-    keyboard.append([InlineKeyboardButton(text=" Edit Media", callback_data="edit_media")])
-    keyboard.append([InlineKeyboardButton(text=" Edit Buttons", callback_data="edit_buttons")])
+    keyboard.append([InlineKeyboardButton(text="Edit Media", callback_data="edit_media")])
+    keyboard.append([InlineKeyboardButton(text="Edit Buttons", callback_data="edit_buttons")])
     
     # Special section for posts without buttons - add quick action buttons
     if not content.get("buttons"):
         content_text += "\n\n **This post has no buttons. Quick actions:**"
         keyboard.append([
-            InlineKeyboardButton(text=" Add Button", callback_data="quick_add_button"),
-            InlineKeyboardButton(text=" Add Media", callback_data="quick_add_media")
+            InlineKeyboardButton(text="Add Button", callback_data="quick_add_button"),
+            InlineKeyboardButton(text="Add Media", callback_data="quick_add_media")
         ])
         if not content.get("text"):
-            keyboard.append([InlineKeyboardButton(text=" Add Text", callback_data="quick_add_text")])
+            keyboard.append([InlineKeyboardButton(text="Add Text", callback_data="quick_add_text")])
     
     # Separator line if quick actions were added
     if not content.get("buttons"):
@@ -381,21 +381,21 @@ async def show_post_content_and_edit_options(message: types.Message, content: di
     
     # Message actions
     keyboard.append([
-        InlineKeyboardButton(text=" Pin Message", callback_data="pin_message"),
-        InlineKeyboardButton(text=" Unpin Message", callback_data="unpin_message")
+        InlineKeyboardButton(text="Pin Message", callback_data="pin_message"),
+        InlineKeyboardButton(text="Unpin Message", callback_data="unpin_message")
     ])
     
     keyboard.append([
-        InlineKeyboardButton(text=" Delete Message", callback_data="delete_message"),
-        InlineKeyboardButton(text=" More Options", callback_data="more_options")
+        InlineKeyboardButton(text="Delete Message", callback_data="delete_message"),
+        InlineKeyboardButton(text="More Options", callback_data="more_options")
     ])
     
     # Action buttons
     keyboard.append([
-        InlineKeyboardButton(text=" Save Changes", callback_data="save_edit")
+        InlineKeyboardButton(text="Save Changes", callback_data="save_edit")
     ])
     
-    keyboard.append([InlineKeyboardButton(text=" Cancel Edit", callback_data="cancel_edit")])
+    keyboard.append([InlineKeyboardButton(text="Cancel Edit", callback_data="cancel_edit")])
     
     await message.reply(
         content_text,
@@ -536,7 +536,7 @@ async def handle_edit_text(query: types.CallbackQuery):
         f" **Send the new text content:**",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text=" Back to Edit Menu", callback_data="back_to_edit_menu")]
+            [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
         ])
     )
 
@@ -562,8 +562,8 @@ async def handle_edit_media(query: types.CallbackQuery):
         f"You can send multiple files. Send /done when finished.",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text=" Remove All Media", callback_data="remove_all_media")],
-            [InlineKeyboardButton(text=" Back to Edit Menu", callback_data="back_to_edit_menu")]
+            [InlineKeyboardButton(text="Remove All Media", callback_data="remove_all_media")],
+            [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
         ])
     )
 
@@ -597,8 +597,8 @@ async def handle_edit_buttons(query: types.CallbackQuery):
         f"`Visit Website - https://example.com | Join Channel - https://t.me/channel`",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text=" Remove All Buttons", callback_data="remove_all_buttons")],
-            [InlineKeyboardButton(text=" Back to Edit Menu", callback_data="back_to_edit_menu")]
+            [InlineKeyboardButton(text="Remove All Buttons", callback_data="remove_all_buttons")],
+            [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
         ])
     )
 
@@ -770,8 +770,8 @@ async def handle_pin_message(query: types.CallbackQuery):
             f" All channel subscribers will receive a notification about the pinned message.",
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text=" Back to Edit Menu", callback_data="back_to_edit_menu")],
-                [InlineKeyboardButton(text=" Close", callback_data="cancel_edit")]
+                [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")],
+                [InlineKeyboardButton(text="Close", callback_data="cancel_edit")]
             ])
         )
         
@@ -786,7 +786,7 @@ async def handle_pin_message(query: types.CallbackQuery):
                 f"• Bot has 'Pin Messages' permission",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text=" Back to Edit Menu", callback_data="back_to_edit_menu")]
+                    [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
                 ])
             )
         else:
@@ -796,7 +796,7 @@ async def handle_pin_message(query: types.CallbackQuery):
                 f"**Error:** {error_msg}",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text=" Back to Edit Menu", callback_data="back_to_edit_menu")]
+                    [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
                 ])
             )
 
@@ -831,8 +831,8 @@ async def handle_unpin_message(query: types.CallbackQuery):
             f"The message has been unpinned from **{channel_name}**.",
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text=" Back to Edit Menu", callback_data="back_to_edit_menu")],
-                [InlineKeyboardButton(text=" Close", callback_data="cancel_edit")]
+                [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")],
+                [InlineKeyboardButton(text="Close", callback_data="cancel_edit")]
             ])
         )
         
@@ -847,7 +847,7 @@ async def handle_unpin_message(query: types.CallbackQuery):
                 f"• Bot has 'Pin Messages' permission",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text=" Back to Edit Menu", callback_data="back_to_edit_menu")]
+                    [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
                 ])
             )
         else:
@@ -857,7 +857,7 @@ async def handle_unpin_message(query: types.CallbackQuery):
                 f"**Error:** {error_msg}",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text=" Back to Edit Menu", callback_data="back_to_edit_menu")]
+                    [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
                 ])
             )
 
@@ -880,8 +880,8 @@ async def handle_delete_message(query: types.CallbackQuery):
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [
-                InlineKeyboardButton(text=" Yes, Delete", callback_data="confirm_delete_message"),
-                InlineKeyboardButton(text=" Cancel", callback_data="back_to_edit_menu")
+                InlineKeyboardButton(text="Yes, Delete", callback_data="confirm_delete_message"),
+                InlineKeyboardButton(text="Cancel", callback_data="back_to_edit_menu")
             ]
         ])
     )
@@ -933,7 +933,7 @@ async def handle_confirm_delete_message(query: types.CallbackQuery):
                 f"• Bot has 'Delete Messages' permission",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text=" Back to Edit Menu", callback_data="back_to_edit_menu")]
+                    [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
                 ])
             )
         elif "MESSAGE_DELETE_FORBIDDEN" in error_msg:
@@ -945,7 +945,7 @@ async def handle_confirm_delete_message(query: types.CallbackQuery):
                 f"• The message was posted by someone else",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text=" Back to Edit Menu", callback_data="back_to_edit_menu")]
+                    [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
                 ])
             )
         else:
@@ -955,7 +955,7 @@ async def handle_confirm_delete_message(query: types.CallbackQuery):
                 f"**Error:** {error_msg}",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text=" Back to Edit Menu", callback_data="back_to_edit_menu")]
+                    [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
                 ])
             )
 
@@ -976,22 +976,22 @@ async def handle_more_options(query: types.CallbackQuery):
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [
-                InlineKeyboardButton(text=" Copy Message", callback_data="copy_message"),
-                InlineKeyboardButton(text=" Get Message Link", callback_data="get_message_link")
+                InlineKeyboardButton(text="Copy Message", callback_data="copy_message"),
+                InlineKeyboardButton(text="Get Message Link", callback_data="get_message_link")
             ],
             [
-                InlineKeyboardButton(text=" Message Stats", callback_data="message_stats"),
-                InlineKeyboardButton(text=" Clone Message", callback_data="clone_message")
+                InlineKeyboardButton(text="Message Stats", callback_data="message_stats"),
+                InlineKeyboardButton(text="Clone Message", callback_data="clone_message")
             ],
             [
-                InlineKeyboardButton(text=" Forward Message", callback_data="forward_message"),
-                InlineKeyboardButton(text=" Quote Message", callback_data="quote_message")
+                InlineKeyboardButton(text="Forward Message", callback_data="forward_message"),
+                InlineKeyboardButton(text="Quote Message", callback_data="quote_message")
             ],
             [
-                InlineKeyboardButton(text=" Schedule Edit", callback_data="schedule_edit"),
-                InlineKeyboardButton(text=" Notification Settings", callback_data="notification_settings")
+                InlineKeyboardButton(text="Schedule Edit", callback_data="schedule_edit"),
+                InlineKeyboardButton(text="Notification Settings", callback_data="notification_settings")
             ],
-            [InlineKeyboardButton(text=" Back to Edit Menu", callback_data="back_to_edit_menu")]
+            [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
         ])
     )
 
@@ -1032,7 +1032,7 @@ async def handle_copy_message(query: types.CallbackQuery):
         copy_content,
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text=" Back to More Options", callback_data="more_options")]
+            [InlineKeyboardButton(text="Back to More Options", callback_data="more_options")]
         ])
     )
 
@@ -1075,7 +1075,7 @@ async def handle_get_message_link(query: types.CallbackQuery):
         f" **Tip:** Tap the link to copy it to your clipboard.",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text=" Back to More Options", callback_data="more_options")]
+            [InlineKeyboardButton(text="Back to More Options", callback_data="more_options")]
         ])
     )
 
@@ -1113,7 +1113,7 @@ async def handle_message_stats(query: types.CallbackQuery):
         stats_text,
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text=" Back to More Options", callback_data="more_options")]
+            [InlineKeyboardButton(text="Back to More Options", callback_data="more_options")]
         ])
     )
 
@@ -1140,7 +1140,7 @@ async def handle_advanced_features(query: types.CallbackQuery):
         f"Stay tuned for updates. ",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text=" Back to More Options", callback_data="more_options")]
+            [InlineKeyboardButton(text="Back to More Options", callback_data="more_options")]
         ])
     )
 
@@ -1165,7 +1165,7 @@ async def handle_quick_add_button(query: types.CallbackQuery):
         f" **Tip:** Adding buttons makes your post more interactive!",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text=" Back to Edit Menu", callback_data="back_to_edit_menu")]
+            [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
         ])
     )
 
@@ -1190,8 +1190,8 @@ async def handle_quick_add_media(query: types.CallbackQuery):
         f" **Tip:** Media makes your posts more engaging and visual!",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text=" Remove All Media", callback_data="remove_all_media")],
-            [InlineKeyboardButton(text=" Back to Edit Menu", callback_data="back_to_edit_menu")]
+            [InlineKeyboardButton(text="Remove All Media", callback_data="remove_all_media")],
+            [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
         ])
     )
 
@@ -1216,7 +1216,7 @@ async def handle_quick_add_text(query: types.CallbackQuery):
         f"• `<a href='url'>link text</a>` for links",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text=" Back to Edit Menu", callback_data="back_to_edit_menu")]
+            [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
         ])
     )
 

@@ -196,8 +196,8 @@ async def cmd_broadcast(message: types.Message):
         # Create confirmation keyboard
         keyboard = InlineKeyboardBuilder()
         keyboard.add(
-            types.InlineKeyboardButton(text=" Yes, Send", callback_data=f"broadcast_yes_{session_id}"),
-            types.InlineKeyboardButton(text=" No, Cancel", callback_data=f"broadcast_no_{session_id}")
+            types.InlineKeyboardButton(text="Yes, Send", callback_data=f"broadcast_yes_{session_id}"),
+            types.InlineKeyboardButton(text="No, Cancel", callback_data=f"broadcast_no_{session_id}")
         )
         keyboard.adjust(2)
         

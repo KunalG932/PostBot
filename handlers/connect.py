@@ -227,7 +227,7 @@ async def cmd_connected(message: types.Message):
     
     # Create inline keyboard for managing channels
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=" Disconnect Channel", callback_data="manage_channels")]
+        [InlineKeyboardButton(text="Disconnect Channel", callback_data="manage_channels")]
     ])
     
     await message.reply(
@@ -364,7 +364,7 @@ async def handle_manage_channels(query: types.CallbackQuery):
             )
         ])
     
-    keyboard.append([InlineKeyboardButton(text=" Cancel", callback_data="cancel_manage")])
+    keyboard.append([InlineKeyboardButton(text="Cancel", callback_data="cancel_manage")])
     
     await query.message.edit_text(
         " **Select Channel to Disconnect**\n\n"
@@ -461,7 +461,7 @@ async def handle_cancel_manage(query: types.CallbackQuery):
     
     # Create inline keyboard for managing channels
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=" Disconnect Channel", callback_data="manage_channels")]
+        [InlineKeyboardButton(text="Disconnect Channel", callback_data="manage_channels")]
     ])
     
     await query.message.edit_text(

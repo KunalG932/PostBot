@@ -147,7 +147,7 @@ async def cmd_connected_from_chat(message: types.Message):
                 keyboard = ReplyKeyboardMarkup(
                     keyboard=[
                         [KeyboardButton(text="Disconnect")],
-                        [KeyboardButton(text=" Back")],
+                        [KeyboardButton(text="Back")],
                     ],
                     resize_keyboard=True,
                 )
@@ -195,7 +195,7 @@ async def cmd_disconnect(message: types.Message):
     # Create a keyboard with the "Back" button
     from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
     keyboard = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text=" Back")]],
+        keyboard=[[KeyboardButton(text="Back")]],
         resize_keyboard=True,
     )
 

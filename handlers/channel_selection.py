@@ -46,21 +46,21 @@ async def show_channel_selection(message: types.Message, action="publish"):
     # Multi-select options
     keyboard.append([
         InlineKeyboardButton(
-            text=" Select Multiple",
+            text="Select Multiple",
             callback_data="multi_select_start"
         )
     ])
     
     keyboard.append([
         InlineKeyboardButton(
-            text=" All Channels",
+            text="All Channels",
             callback_data="select_all_channels"
         )
     ])
     
     keyboard.append([
         InlineKeyboardButton(
-            text=" Cancel",
+            text="Cancel",
             callback_data="cancel_channel_selection"
         )
     ])
@@ -206,7 +206,7 @@ async def show_multi_select_interface(message: types.Message, channels, selected
     
     action_row.append(
         InlineKeyboardButton(
-            text=" Cancel",
+            text="Cancel",
             callback_data="cancel_channel_selection"
         )
     )
