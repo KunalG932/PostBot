@@ -1,471 +1,342 @@
-from aiogram import types
+"""
+Connect channel handler for PostBot
+Handles connecting and disconnecting channels
+"""
+from aiogram import types, F
 from aiogram.filters import Command
 from aiogram.enums import ParseMode
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+import html
 
 from constants import router
 from db import db
-
+from config import Config
+from utils.logger import logger, log_user_action
 
 @router.message(Command("connect"))
 async def cmd_connect(message: types.Message):
-    # Get the channel username from the user's message
-    command_parts = message.text.split(maxsplit=1)
+    """Connect a channel to the bot"""
+    # Check if user has reached the limit
+    user = await db.users.find_one({"user_id": message.from_user.id})
+    connected_channels = user.get("connected_channels", []) if user else []
     
+    if len(connected_channels) >= Config.MAX_CHANNELS_PER_USER and not Config.is_admin(message.from_user.id):
+        await message.reply(
+            f"<b>Limit Reached</b>\n\n"
+            f"You have reached the maximum limit of {Config.MAX_CHANNELS_PER_USER} connected channels.\n"
+            "Please disconnect a channel before adding a new one.",
+            parse_mode=ParseMode.HTML
+        )
+        return
+
+    command_parts = message.text.split()
     if len(command_parts) < 2:
         await message.reply(
-            " **Connect to Channel**\n\n"
+            "<b>Connect to Channel</b>\n\n"
             "Please provide the username of the channel to connect.\n"
-            "Usage: `/connect @channelname` or `/connect channelname`",
-            parse_mode=ParseMode.MARKDOWN
+            "Usage: <code>/connect @channelname</code> or <code>/connect channelname</code>",
+            parse_mode=ParseMode.HTML
         )
         return
     
-    channel_username = command_parts[1].strip()
-    original_input = channel_username
+    original_input = command_parts[1]
+    channel_identifier = original_input
     
-    # Clean the channel username - handle both @username and -chatid formats
-    if channel_username.startswith('@'):
-        channel_username = channel_username[1:]
-    
-    # Try to parse as chat ID first (for private groups/supergroups)
-    chat_identifier = None
-    if channel_username.startswith('-') or (channel_username.lstrip('-').isdigit()):
-        try:
-            chat_identifier = int(channel_username)
-        except ValueError:
-            chat_identifier = f"@{channel_username}"
-    else:
-        chat_identifier = f"@{channel_username}"
-
-    try:
-        # Get information about the chat (channel)
-        chat_info = await message.bot.get_chat(chat_identifier)
-        
-        # Check if it's a channel (only allow channels, not groups/supergroups/private chats)
-        if chat_info.type not in ['channel']:
-            chat_type_names = {
-                'private': 'Private Chat',
-                'group': 'Group',
-                'supergroup': 'Supergroup',
-                'channel': 'Channel'
-            }
-            current_type = chat_type_names.get(chat_info.type, chat_info.type.title())
+    # Normalize input
+    if not channel_identifier.startswith("@") and not channel_identifier.startswith("-100"):
+        if channel_identifier.replace("-", "").isdigit():
+            # It's a chat ID
+            pass
+        else:
+            # Assume it's a username without @
+            channel_identifier = f"@{channel_identifier}"
             
+    status_msg = await message.reply("Checking channel...")
+    
+    try:
+        # Get chat info
+        chat_info = await message.bot.get_chat(channel_identifier)
+        
+        # Verify it's a channel
+        if chat_info.type != "channel":
+            current_type = chat_info.type.title()
+            title = html.escape(chat_info.title or str(channel_identifier))
             await message.reply(
-                " **Only Channels Supported**\n\n"
-                f"**{chat_info.title or chat_identifier}** is a **{current_type}**.\n\n"
+                "<b>Only Channels Supported</b>\n\n"
+                f"<b>{title}</b> is a <b>{current_type}</b>.\n\n"
                 "This bot only supports channels:\n"
                 "• Public channels (@channelname)\n"
                 "• Private channels (with chat ID)\n\n"
                 "Please use a channel instead of groups or private chats.",
-                parse_mode=ParseMode.MARKDOWN
+                parse_mode=ParseMode.HTML
             )
             return
-
-        # Check if the bot is an administrator in the channel
+            
+        # Check if bot is admin
         try:
-            bot_member = await message.bot.get_chat_member(chat_identifier, message.bot.id)
+            bot_member = await message.bot.get_chat_member(chat_info.id, message.bot.id)
             if bot_member.status not in ['administrator', 'creator']:
+                title = html.escape(chat_info.title or str(channel_identifier))
                 await message.reply(
-                    " **Bot Not Admin**\n\n"
-                    f"Bot must be an admin in **{chat_info.title or chat_identifier}** to connect.\n"
+                    "<b>Bot Not Admin</b>\n\n"
+                    f"Bot must be an admin in <b>{title}</b> to connect.\n"
                     "Please promote the bot and try again.",
-                    parse_mode=ParseMode.MARKDOWN
+                    parse_mode=ParseMode.HTML
                 )
                 return
         except Exception as member_error:
+            title = html.escape(chat_info.title or str(channel_identifier))
+            error_msg = html.escape(str(member_error))
             await message.reply(
-                " **Permission Check Failed**\n\n"
-                f"Cannot verify bot permissions in **{chat_info.title or chat_identifier}**.\n\n"
-                f"Error: {str(member_error)}\n\n"
+                "<b>Permission Check Failed</b>\n\n"
+                f"Cannot verify bot permissions in <b>{title}</b>.\n\n"
+                f"Error: {error_msg}\n\n"
                 "Please ensure:\n"
                 "• The bot is added to the channel\n"
                 "• The bot has admin privileges\n"
                 "• The channel allows bots",
-                parse_mode=ParseMode.MARKDOWN
+                parse_mode=ParseMode.HTML
             )
             return
             
+        # Check if already connected by this user
+        for channel in connected_channels:
+            if str(channel.get("chat_id")) == str(chat_info.id):
+                title = html.escape(chat_info.title or str(channel_identifier))
+                await message.reply(
+                    f"<b>Already Connected</b>\n\n"
+                    f"You are already connected to <b>{title}</b>",
+                    parse_mode=ParseMode.HTML
+                )
+                return
+                
+        # Add to database
+        new_channel = {
+            "chat_id": chat_info.id,
+            "title": chat_info.title,
+            "username": chat_info.username,
+            "type": chat_info.type,
+            "connected_at": message.date
+        }
+        
+        await db.users.update_one(
+            {"user_id": message.from_user.id},
+            {"$push": {"connected_channels": new_channel}}
+        )
+        
+        # Update current channels list for response
+        connected_channels.append(new_channel)
+        
+        title = html.escape(chat_info.title or str(channel_identifier))
+        await message.reply(
+            f"<b>Successfully Connected!</b>\n\n"
+            f"Connected to: <b>{title}</b>\n"
+            f"Type: <b>{chat_info.type.title()}</b>\n"
+            f"Total connected channels: <b>{len(connected_channels)}</b>",
+            parse_mode=ParseMode.HTML
+        )
+        
+        log_user_action(message.from_user.id, "CONNECT_CHANNEL", f"Channel: {chat_info.id}")
+        
     except Exception as e:
         error_message = str(e).lower()
-        
         if "chat not found" in error_message or "chat_not_found" in error_message:
+            safe_input = html.escape(original_input)
             await message.reply(
-                " **Channel Not Found**\n\n"
-                f"Could not find: **{original_input}**\n\n"
+                "<b>Channel Not Found</b>\n\n"
+                f"Could not find: <b>{safe_input}</b>\n\n"
                 "Please check:\n"
                 "• Channel exists and is accessible\n"
                 "• Correct username format (@channelname)\n"
                 "• For private channels, use the numeric chat ID\n"
                 "• Bot has been added to the channel\n\n"
-                "**Examples:**\n"
-                "• `/connect @publicchannel`\n"
-                "• `/connect -1001234567890` (for private channels)",
-                parse_mode=ParseMode.MARKDOWN
+                "<b>Examples:</b>\n"
+                "• <code>/connect @publicchannel</code>\n"
+                "• <code>/connect -1001234567890</code> (for private channels)",
+                parse_mode=ParseMode.HTML
             )
         elif "forbidden" in error_message or "not enough rights" in error_message:
+            safe_input = html.escape(original_input)
             await message.reply(
-                " **Access Forbidden**\n\n"
-                f"Bot doesn't have access to **{original_input}**\n\n"
+                "<b>Access Forbidden</b>\n\n"
+                f"Bot doesn't have access to <b>{safe_input}</b>\n\n"
                 "Please ensure:\n"
                 "• Bot is added to the channel\n"
                 "• Bot has admin privileges\n"
                 "• Channel allows bots",
-                parse_mode=ParseMode.MARKDOWN
+                parse_mode=ParseMode.HTML
             )
         elif "bad request" in error_message:
+            safe_input = html.escape(original_input)
             await message.reply(
-                " **Invalid Request**\n\n"
-                f"Invalid channel identifier: **{original_input}**\n\n"
+                "<b>Invalid Request</b>\n\n"
+                f"Invalid channel identifier: <b>{safe_input}</b>\n\n"
                 "Please use:\n"
-                "• Public channel: `@channelname`\n"
-                "• Private channel: `-1001234567890`\n"
+                "• Public channel: <code>@channelname</code>\n"
+                "• Private channel: <code>-1001234567890</code>\n"
                 "• Make sure the identifier is correct",
-                parse_mode=ParseMode.MARKDOWN
+                parse_mode=ParseMode.HTML
             )
         else:
+            error_msg = html.escape(str(e))
             await message.reply(
-                " **Connection Failed**\n\n"
-                f"Error: {str(e)}\n\n"
+                "<b>Connection Failed</b>\n\n"
+                f"Error: {error_msg}\n\n"
                 "Please make sure:\n"
                 "• The channel exists\n"
                 "• The bot has access to it\n"
                 "• The bot is an admin\n"
                 "• The identifier is correct",
-                parse_mode=ParseMode.MARKDOWN
+                parse_mode=ParseMode.HTML
             )
-        return
-
-    # Get current user data
-    user_info = await db.users.find_one({"user_id": message.from_user.id})
-    current_channels = user_info.get("connected_channels", []) if user_info else []
-    
-    # Check if channel is already connected
-    channel_data = {
-        "username": str(chat_identifier),
-        "title": chat_info.title or str(chat_identifier),
-        "chat_id": chat_info.id,
-        "type": chat_info.type
-    }
-    
-    # Check if already connected
-    for existing_channel in current_channels:
-        if (existing_channel.get("username") == str(chat_identifier) or 
-            existing_channel.get("chat_id") == chat_info.id):
-            await message.reply(
-                f" **Already Connected**\n\n"
-                f"You are already connected to **{chat_info.title or chat_identifier}**",
-                parse_mode=ParseMode.MARKDOWN
-            )
-            return
-
-    # Add new channel to the list
-    current_channels.append(channel_data)
-    
-    # Update user information with connected channels
-    await db.users.update_one(
-        {"user_id": message.from_user.id},
-        {
-            "$set": {
-                "connected_channels": current_channels,
-                # Keep backward compatibility
-                "connected_chat": str(chat_identifier),
-                "connected_channel": str(chat_identifier)
-            }
-        },
-        upsert=True,
-    )
-
-    await message.reply(
-        f" **Successfully Connected!**\n\n"
-        f"Connected to: **{chat_info.title or chat_identifier}**\n"
-        f"Type: **{chat_info.type.title()}**\n"
-        f"Total connected channels: **{len(current_channels)}**",
-        parse_mode=ParseMode.MARKDOWN
-    )
-
+        logger.error(f"Connect channel error: {e}")
+    finally:
+        try:
+            await status_msg.delete()
+        except:
+            pass
 
 @router.message(Command("connected"))
 async def cmd_connected(message: types.Message):
-    # Retrieve connected channels from the user's information
-    user_info = await db.users.find_one({"user_id": message.from_user.id})
-    
-    if not user_info:
-        await message.reply(
-            " **No Connected Channels**\n\n"
-            "You are not currently connected to any channels.\n"
-            "Use `/connect @channelname` to connect to a channel.",
-            parse_mode=ParseMode.MARKDOWN
-        )
-        return
-    
-    connected_channels = user_info.get("connected_channels", [])
+    """List connected channels"""
+    user = await db.users.find_one({"user_id": message.from_user.id})
+    connected_channels = user.get("connected_channels", []) if user else []
     
     if not connected_channels:
         await message.reply(
-            " **No Connected Channels**\n\n"
-            "You are not currently connected to any channels.\n"
-            "Use `/connect @channelname` to connect to a channel.",
-            parse_mode=ParseMode.MARKDOWN
+            "<b>No Connected Channels</b>\n\n"
+            "You haven't connected any channels yet.\n"
+            "Use <code>/connect</code> to add a channel.",
+            parse_mode=ParseMode.HTML
         )
         return
     
-    # Create response with all connected channels
-    response = " **Connected Channels**\n\n"
-    
+    response = "<b>Connected Channels</b>\n\n"
     for i, channel in enumerate(connected_channels, 1):
-        title = channel.get("title", channel.get("username", "Unknown"))
-        username = channel.get("username", "")
-        response += f"{i}. **{title}**\n"
+        title = html.escape(channel.get('title', 'Unknown'))
+        username = channel.get('username')
+        chat_id = channel.get('chat_id')
+        
+        response += f"{i}. <b>{title}</b>\n"
         if username:
-            response += f"    {username}\n"
+            response += f"   @{username}\n"
+        else:
+            response += f"   ID: {chat_id}\n"
         response += "\n"
+        
+    response += f"Total: {len(connected_channels)}/{Config.MAX_CHANNELS_PER_USER}"
     
-    response += f"**Total:** {len(connected_channels)} channel(s)\n\n"
-    response += "Use `/disconnect @channelname` to disconnect from a channel"
-    
-    # Create inline keyboard for managing channels
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Disconnect Channel", callback_data="manage_channels")]
-    ])
-    
-    await message.reply(
-        response,
-        parse_mode=ParseMode.MARKDOWN,
-        reply_markup=keyboard
-    )
-
+    await message.reply(response, parse_mode=ParseMode.HTML)
 
 @router.message(Command("disconnect"))
 async def cmd_disconnect(message: types.Message):
-    # Get the channel username from the user's message
-    command_parts = message.text.split(maxsplit=1)
-    
-    if len(command_parts) < 2:
-        await message.reply(
-            " **Disconnect from Channel**\n\n"
-            "Please provide the username or chat ID of the channel to disconnect.\n"
-            "Usage: `/disconnect @channelname` or `/disconnect -1001234567890`",
-            parse_mode=ParseMode.MARKDOWN
-        )
-        return
-    
-    channel_identifier = command_parts[1].strip()
-    original_input = channel_identifier
-
-    # Clean the channel identifier - handle both @username and -chatid formats
-    if channel_identifier.startswith('@'):
-        channel_identifier = channel_identifier[1:]
-    
-    # Try to parse as chat ID first (for private groups/supergroups)
-    if channel_identifier.startswith('-') or (channel_identifier.lstrip('-').isdigit()):
-        try:
-            chat_id = int(channel_identifier)
-            search_identifier = str(chat_id)
-        except ValueError:
-            search_identifier = f"@{channel_identifier}"
-    else:
-        search_identifier = f"@{channel_identifier}"
-
-    # Get current user data
-    user_info = await db.users.find_one({"user_id": message.from_user.id})
-    
-    if not user_info:
-        await message.reply(
-            " **No Connected Channels**\n\n"
-            "You are not connected to any channels.",
-            parse_mode=ParseMode.MARKDOWN
-        )
-        return
-    
-    current_channels = user_info.get("connected_channels", [])
-    
-    if not current_channels:
-        await message.reply(
-            " **No Connected Channels**\n\n"
-            "You are not connected to any channels.",
-            parse_mode=ParseMode.MARKDOWN
-        )
-        return
-
-    # Find and remove the channel
-    channel_found = False
-    removed_channel_title = None
-    updated_channels = []
-    
-    for channel in current_channels:
-        # Check both username and chat_id for matching
-        if (channel.get("username") == search_identifier or 
-            str(channel.get("chat_id")) == search_identifier.replace('@', '') or
-            str(channel.get("chat_id")) == channel_identifier):
-            channel_found = True
-            removed_channel_title = channel.get("title", search_identifier)
-        else:
-            updated_channels.append(channel)
-    
-    if not channel_found:
-        await message.reply(
-            f" **Channel Not Found**\n\n"
-            f"You are not connected to {original_input}.\n"
-            f"Use `/connected` to see your connected channels.",
-            parse_mode=ParseMode.MARKDOWN
-        )
-        return
-    
-    # Update user information
-    update_data = {"connected_channels": updated_channels}
-    
-    # Update backward compatibility fields
-    if updated_channels:
-        update_data["connected_chat"] = updated_channels[0]["username"]
-        update_data["connected_channel"] = updated_channels[0]["username"]
-    else:
-        update_data["connected_chat"] = None
-        update_data["connected_channel"] = None
-    
-    await db.users.update_one(
-        {"user_id": message.from_user.id},
-        {"$set": update_data}
-    )
-
-    await message.reply(
-        f" **Disconnected Successfully!**\n\n"
-        f"Disconnected from: **{removed_channel_title or original_input}**\n"
-        f"Remaining connected channels: **{len(updated_channels)}**",
-        parse_mode=ParseMode.MARKDOWN
-    )
-
-
-@router.callback_query(lambda query: query.data == "manage_channels")
-async def handle_manage_channels(query: types.CallbackQuery):
-    await query.answer()
-    
-    # Get user's connected channels
-    user_info = await db.users.find_one({"user_id": query.from_user.id})
-    connected_channels = user_info.get("connected_channels", []) if user_info else []
+    """Disconnect a channel"""
+    user = await db.users.find_one({"user_id": message.from_user.id})
+    connected_channels = user.get("connected_channels", []) if user else []
     
     if not connected_channels:
-        await query.message.edit_text(
-            " **No Connected Channels**\n\n"
-            "You are not connected to any channels.",
-            parse_mode=ParseMode.MARKDOWN
+        await message.reply(
+            "<b>No Channels to Disconnect</b>\n\n"
+            "You don't have any connected channels.",
+            parse_mode=ParseMode.HTML
         )
         return
-    
-    # Create inline keyboard for disconnecting channels
-    keyboard = []
-    for i, channel in enumerate(connected_channels):
-        title = channel.get("title", channel.get("username", "Unknown"))
-        keyboard.append([
-            InlineKeyboardButton(
-                text=f" {title}",
-                callback_data=f"disconnect_{i}"
+        
+    # If arguments provided, try to disconnect specific channel
+    command_parts = message.text.split()
+    if len(command_parts) > 1:
+        target = command_parts[1]
+        
+        # Find channel to remove
+        channel_to_remove = None
+        for channel in connected_channels:
+            if (str(channel.get('chat_id')) == target or 
+                f"@{channel.get('username')}" == target or 
+                channel.get('username') == target):
+                channel_to_remove = channel
+                break
+        
+        if channel_to_remove:
+            await db.users.update_one(
+                {"user_id": message.from_user.id},
+                {"$pull": {"connected_channels": {"chat_id": channel_to_remove['chat_id']}}}
             )
-        ])
+            
+            safe_title = html.escape(channel_to_remove.get('title', 'Unknown'))
+            await message.reply(
+                f"<b>Disconnected Successfully</b>\n\n"
+                f"Removed: <b>{safe_title}</b>",
+                parse_mode=ParseMode.HTML
+            )
+            log_user_action(message.from_user.id, "DISCONNECT_CHANNEL", f"Channel: {channel_to_remove['chat_id']}")
+        else:
+            safe_target = html.escape(target)
+            await message.reply(
+                f"<b>Channel Not Found</b>\n\n"
+                f"Could not find connected channel: <b>{safe_target}</b>",
+                parse_mode=ParseMode.HTML
+            )
+        return
+
+    # Show interactive menu
+    keyboard = []
+    for channel in connected_channels:
+        title = channel.get('title', channel.get('username', 'Unknown'))
+        if len(title) > 30:
+            title = title[:27] + "..."
+        
+        callback_data = f"disconnect_{channel.get('chat_id')}"
+        keyboard.append([InlineKeyboardButton(text=f"❌ {title}", callback_data=callback_data)])
     
     keyboard.append([InlineKeyboardButton(text="Cancel", callback_data="cancel_manage")])
     
-    await query.message.edit_text(
-        " **Select Channel to Disconnect**\n\n"
-        "Choose a channel to disconnect from:",
-        parse_mode=ParseMode.MARKDOWN,
+    await message.reply(
+        "<b>Disconnect Channel</b>\n\n"
+        "Select a channel to disconnect:",
+        parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
     )
 
-
 @router.callback_query(lambda query: query.data.startswith("disconnect_"))
 async def handle_disconnect_channel(query: types.CallbackQuery):
-    await query.answer()
+    """Handle disconnect callback"""
+    chat_id = query.data.replace("disconnect_", "")
     
-    try:
-        channel_index = int(query.data.split("_")[1])
-        
-        # Get user's connected channels
-        user_info = await db.users.find_one({"user_id": query.from_user.id})
-        connected_channels = user_info.get("connected_channels", []) if user_info else []
-        
-        if channel_index >= len(connected_channels):
-            await query.message.edit_text(
-                " **Error**\n\n"
-                "Channel not found.",
-                parse_mode=ParseMode.MARKDOWN
-            )
-            return
-        
-        # Remove the selected channel
-        removed_channel = connected_channels.pop(channel_index)
-        removed_title = removed_channel.get("title", removed_channel.get("username", "Unknown"))
-        
-        # Update user information
-        update_data = {"connected_channels": connected_channels}
-        
-        # Update backward compatibility fields
-        if connected_channels:
-            update_data["connected_chat"] = connected_channels[0]["username"]
-            update_data["connected_channel"] = connected_channels[0]["username"]
-        else:
-            update_data["connected_chat"] = None
-            update_data["connected_channel"] = None
-        
+    user = await db.users.find_one({"user_id": query.from_user.id})
+    connected_channels = user.get("connected_channels", [])
+    
+    channel_to_remove = None
+    for channel in connected_channels:
+        if str(channel.get('chat_id')) == str(chat_id):
+            channel_to_remove = channel
+            break
+    
+    if channel_to_remove:
         await db.users.update_one(
             {"user_id": query.from_user.id},
-            {"$set": update_data}
-        )
-
-        await query.message.edit_text(
-            f" **Disconnected Successfully!**\n\n"
-            f"Disconnected from: **{removed_title}**\n"
-            f"Remaining connected channels: **{len(connected_channels)}**",
-            parse_mode=ParseMode.MARKDOWN
+            {"$pull": {"connected_channels": {"chat_id": channel_to_remove['chat_id']}}}
         )
         
-    except (ValueError, IndexError):
+        safe_title = html.escape(channel_to_remove.get('title', 'Unknown'))
+        remaining = len(connected_channels) - 1
+        
         await query.message.edit_text(
-            " **Error**\n\n"
-            "Invalid channel selection.",
-            parse_mode=ParseMode.MARKDOWN
+            f"<b>Disconnected Successfully!</b>\n\n"
+            f"Disconnected from: <b>{safe_title}</b>\n"
+            f"Remaining connected channels: <b>{remaining}</b>",
+            parse_mode=ParseMode.HTML
         )
-
+        log_user_action(query.from_user.id, "DISCONNECT_CHANNEL", f"Channel: {chat_id}")
+    else:
+        await query.message.edit_text(
+            "<b>Error</b>\n\nChannel not found or already disconnected.",
+            parse_mode=ParseMode.HTML
+        )
+    
+    await query.answer()
 
 @router.callback_query(lambda query: query.data == "cancel_manage")
 async def handle_cancel_manage(query: types.CallbackQuery):
-    await query.answer()
-    
-    # Recreate the original message instead of calling cmd_connected
-    # to avoid issues with message context
-    user_info = await db.users.find_one({"user_id": query.from_user.id})
-    connected_channels = user_info.get("connected_channels", []) if user_info else []
-    
-    if not connected_channels:
-        await query.message.edit_text(
-            " **No Connected Channels**\n\n"
-            "You are not connected to any channels.",
-            parse_mode=ParseMode.MARKDOWN
-        )
-        return
-    
-    # Create response with all connected channels
-    response = " **Connected Channels**\n\n"
-    
-    for i, channel in enumerate(connected_channels, 1):
-        title = channel.get("title", channel.get("username", "Unknown"))
-        username = channel.get("username", "")
-        response += f"{i}. **{title}**\n"
-        if username:
-            response += f"    {username}\n"
-        response += "\n"
-    
-    response += f"**Total:** {len(connected_channels)} channel(s)\n\n"
-    response += "Use `/disconnect @channelname` to disconnect from a channel"
-    
-    # Create inline keyboard for managing channels
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Disconnect Channel", callback_data="manage_channels")]
-    ])
-    
-    await query.message.edit_text(
-        response,
-        parse_mode=ParseMode.MARKDOWN,
-        reply_markup=keyboard
-    )
+    """Cancel management action"""
+    await query.message.edit_text("Action cancelled.")
+    await query.answer("Cancelled")

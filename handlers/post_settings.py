@@ -1,6 +1,7 @@
 """
 Post settings handlers (pin, notifications, link preview)
 """
+import html
 from aiogram import types
 from aiogram.enums import ParseMode
 
@@ -21,9 +22,9 @@ async def cmd_toggle_pin(message: types.Message):
     pin_status = "ON" if user_data["pin_post"] else "OFF"
     
     await message.answer(
-        f"**Pin Post: {pin_status}**\n\n"
+        f"<b>Pin Post: {pin_status}</b>\n\n"
         f"Your post will {'be pinned' if user_data['pin_post'] else 'not be pinned'} in the channel.",
-        parse_mode=ParseMode.MARKDOWN
+        parse_mode=ParseMode.HTML
     )
     
     # Return to main post menu
@@ -44,9 +45,9 @@ async def cmd_toggle_notifications(message: types.Message):
     notif_status = "ON" if user_data["notifications"] else "OFF"
     
     await message.answer(
-        f"**Notifications: {notif_status}**\n\n"
+        f"<b>Notifications: {notif_status}</b>\n\n"
         f"Members will {'receive' if user_data['notifications'] else 'not receive'} notifications for this post.",
-        parse_mode=ParseMode.MARKDOWN
+        parse_mode=ParseMode.HTML
     )
     
     # Return to main post menu
@@ -67,9 +68,9 @@ async def cmd_toggle_link_preview(message: types.Message):
     preview_status = "ON" if user_data["link_preview"] else "OFF"
     
     await message.answer(
-        f"**Link Preview: {preview_status}**\n\n"
+        f"<b>Link Preview: {preview_status}</b>\n\n"
         f"Links in your post will {'show' if user_data['link_preview'] else 'not show'} previews.",
-        parse_mode=ParseMode.MARKDOWN
+        parse_mode=ParseMode.HTML
     )
     
     # Return to main post menu

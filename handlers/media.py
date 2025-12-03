@@ -1,6 +1,7 @@
 """
 Media handling functionality
 """
+import html
 from aiogram import types
 from aiogram.enums import ParseMode
 
@@ -68,8 +69,8 @@ async def process_media_input(message: types.Message):
         media_count = len(user_data["media"])
         
         await message.answer(
-            f"**Media Added!**\n\n"
+            f"<b>Media Added!</b>\n\n"
             f"Total media files: {media_count}\n"
             f"You can send more media or click 'Done Adding Media' when finished.",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=ParseMode.HTML
         )

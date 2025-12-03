@@ -1,742 +1,617 @@
 """
-Edit post functionality - allows users to edit existing posts by first selecting channel then providing message links
+Edit post handler for PostBot
+Allows editing existing posts in channels
 """
-import re
-import logging
-from aiogram import types
+from aiogram import types, F
 from aiogram.filters import Command
 from aiogram.enums import ParseMode
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto, InputMediaVideo, InputMediaDocument, InputMediaAnimation
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+import asyncio
+import html
 
 from constants import router
 from db import db
-from utils.data_store import get_user_data, set_user_data, clear_user_data
-from utils.keyboards import create_inline_buttons_keyboard
+from config import Config
+from utils.logger import logger, log_user_action
 
-# Set up logging
-logger = logging.getLogger(__name__)
+# Simple in-memory storage for edit states
+# In a production app, use Redis or database
+edit_sessions = {}
 
+def get_user_data(user_id):
+    if user_id not in edit_sessions:
+        edit_sessions[user_id] = {}
+    return edit_sessions[user_id]
+
+def set_user_data(user_id, data):
+    edit_sessions[user_id] = data
+
+def clear_user_data(user_id):
+    if user_id in edit_sessions:
+        del edit_sessions[user_id]
 
 @router.message(Command("edit"))
 async def cmd_edit_post(message: types.Message):
-    """Start edit post process - show channel selection"""
-    user_data = get_user_data(message.from_user.id)
+    """Start the edit post flow"""
+    # Check if user has any connected channels
+    user = await db.users.find_one({"user_id": message.from_user.id})
     
-    # Get user's connected channels
-    user_info = await db.users.find_one({"user_id": message.from_user.id})
-    
-    if not user_info or not user_info.get("connected_channels"):
+    if not user or not user.get("connected_channels"):
         await message.reply(
-            " **No Connected Channels**\n\n"
-            "You don't have any connected channels yet.\n"
-            "Use `/connect` to connect your channels first.",
-            parse_mode=ParseMode.MARKDOWN
+            "<b>No Connected Channels</b>\n\n"
+            "You need to connect a channel first to edit posts.\n"
+            "Use <code>/connect</code> to add a channel.",
+            parse_mode=ParseMode.HTML
         )
         return
     
-    connected_channels = user_info.get("connected_channels", [])
+    connected_channels = user.get("connected_channels", [])
     
-    if len(connected_channels) == 1:
-        # If user has only one channel, select it automatically
-        channel = connected_channels[0]
-        user_data["selected_channel"] = channel
-        user_data["state"] = "waiting_edit_link"
-        set_user_data(message.from_user.id, user_data)
-        
-        await show_post_link_request(message, channel)
-    else:
-        # Show channel selection if user has multiple channels
-        user_data["state"] = "selecting_edit_channel"
-        set_user_data(message.from_user.id, user_data)
-        
-        await show_channel_selection(message, connected_channels)
-
-
-async def show_channel_selection(message: types.Message, channels: list, is_callback: bool = False):
-    """Show channel selection for editing"""
+    # Create keyboard with channels
     keyboard = []
-    
-    for i, channel in enumerate(channels):
-        channel_name = channel.get("title", channel.get("username", "Unknown Channel"))
-        keyboard.append([
-            InlineKeyboardButton(
-                text=f" {channel_name}",
-                callback_data=f"select_edit_channel_{i}"
-            )
-        ])
+    for channel in connected_channels:
+        title = channel.get('title', channel.get('username', 'Unknown'))
+        # Truncate long titles
+        if len(title) > 30:
+            title = title[:27] + "..."
+            
+        callback_data = f"edit_channel_{channel.get('chat_id')}"
+        keyboard.append([InlineKeyboardButton(text=title, callback_data=callback_data)])
     
     keyboard.append([InlineKeyboardButton(text="Cancel", callback_data="cancel_edit")])
     
-    content = (
-        " **Edit Post**\n\n"
-        " **Select the channel where you want to edit a post:**"
-    )
-    
-    markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
-    
-    if is_callback:
-        await message.edit_text(
-            content,
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=markup
-        )
-    else:
-        await message.reply(
-            content,
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=markup
-        )
-
-
-@router.callback_query(lambda query: query.data.startswith("select_edit_channel_"))
-async def handle_channel_selection(query: types.CallbackQuery):
-    """Handle channel selection for editing"""
-    await query.answer()
-    
-    try:
-        channel_index = int(query.data.split("_")[-1])
-        
-        # Get user's connected channels
-        user_info = await db.users.find_one({"user_id": query.from_user.id})
-        connected_channels = user_info.get("connected_channels", [])
-        
-        if channel_index >= len(connected_channels):
-            await query.message.edit_text(
-                " **Error**\n\nInvalid channel selection.",
-                parse_mode=ParseMode.MARKDOWN
-            )
-            return
-        
-        selected_channel = connected_channels[channel_index]
-        
-        # Store selected channel in user data
-        user_data = get_user_data(query.from_user.id)
-        user_data["selected_channel"] = selected_channel
-        user_data["state"] = "waiting_edit_link"
-        set_user_data(query.from_user.id, user_data)
-        
-        await show_post_link_request(query.message, selected_channel, is_callback=True)
-        
-    except (ValueError, IndexError):
-        await query.message.edit_text(
-            " **Error**\n\nInvalid channel selection.",
-            parse_mode=ParseMode.MARKDOWN
-        )
-
-
-async def show_post_link_request(message: types.Message, channel: dict, is_callback: bool = False):
-    """Show post link request for selected channel"""
-    channel_name = channel.get("title", channel.get("username", "Unknown Channel"))
-    
-    content = (
-        f" **Edit Post in {channel_name}**\n\n"
-        f" **Send me the message link of the post you want to edit:**\n\n"
-        f"**Message link formats:**\n"
-        f"• `https://t.me/channelname/123`\n"
-        f"• `https://t.me/c/1234567890/123`\n\n"
-        f"**How to get the message link:**\n"
-        f"1.  Open the post in your channel\n"
-        f"2.  Click the three dots (...) or long press\n"
-        f"3.  Select 'Copy Link'\n"
-        f"4.  Send the link here"
-    )
-    
-    markup = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Back to Channel Selection", callback_data="back_to_channel_selection")],
-        [InlineKeyboardButton(text="Cancel", callback_data="cancel_edit")]
-    ])
-    
-    if is_callback:
-        await message.edit_text(
-            content,
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=markup
-        )
-    else:
-        await message.reply(
-            content,
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=markup
-        )
-
-
-@router.callback_query(lambda query: query.data == "back_to_channel_selection")
-async def handle_back_to_channel_selection(query: types.CallbackQuery):
-    """Go back to channel selection"""
-    await query.answer()
-    
-    # Get user's connected channels
-    user_info = await db.users.find_one({"user_id": query.from_user.id})
-    connected_channels = user_info.get("connected_channels", [])
-    
-    user_data = get_user_data(query.from_user.id)
-    user_data["state"] = "selecting_edit_channel"
-    set_user_data(query.from_user.id, user_data)
-    
-    await show_channel_selection(query.message, connected_channels, is_callback=True)
-
-
-@router.message(lambda message: message.text and message.text.startswith("https://t.me/"))
-async def handle_message_link(message: types.Message):
-    """Handle message links for editing"""
-    user_data = get_user_data(message.from_user.id)
-    
-    if user_data.get("state") != "waiting_edit_link":
-        return  # Not in edit mode
-    
-    selected_channel = user_data.get("selected_channel")
-    if not selected_channel:
-        await message.reply(
-            " **Error**\n\nNo channel selected. Please start over with `/edit`",
-            parse_mode=ParseMode.MARKDOWN
-        )
-        return
-    
-    message_link = message.text.strip()
-    
-    # Log user and channel information
-    logger.info(f"User {message.from_user.id} (@{message.from_user.username}) sent message link: {message_link}")
-    logger.info(f"Selected channel info: {selected_channel}")
-    
-    # Parse the message link
-    chat_id, message_id = await parse_message_link(message_link)
-    
-    if not chat_id or not message_id:
-        logger.warning(f"Failed to parse message link: {message_link}")
-        await message.reply(
-            " **Invalid Message Link**\n\n"
-            "Please send a valid Telegram message link.\n\n"
-            "**Valid formats:**\n"
-            "`https://t.me/channelname/123`\n"
-            "`https://t.me/c/1234567890/123`",
-            parse_mode=ParseMode.MARKDOWN
-        )
-        return
-    
-    logger.info(f"Parsed link - Chat ID: {chat_id}, Message ID: {message_id}")
-    
-    # Verify the link belongs to the selected channel
-    channel_match = await verify_channel_match(chat_id, selected_channel)
-    logger.info(f"Channel match result: {channel_match}")
-    
-    if not channel_match:
-        channel_name = selected_channel.get("title", selected_channel.get("username", "Unknown"))
-        logger.warning(f"Channel mismatch - Link chat_id: {chat_id}, Channel: {selected_channel}")
-        await message.reply(
-            f" **Channel Mismatch**\n\n"
-            f"This message link doesn't belong to the selected channel **{channel_name}**.\n\n"
-            f"Please send a message link from the correct channel.\n\n"
-            f"**Debug Info:**\n"
-            f"Link Chat ID: `{chat_id}`\n"
-            f"Channel Chat ID: `{selected_channel.get('chat_id', 'N/A')}`\n"
-            f"Channel Username: `{selected_channel.get('username', 'N/A')}`",
-            parse_mode=ParseMode.MARKDOWN
-        )
-        return
-    
-    # Try to get the message content
-    try:
-        post_content = await get_message_content(message.bot, chat_id, message_id, message.from_user.id)
-        
-        if not post_content:
-            await message.reply(
-                " **Message Not Found**\n\n"
-                "Could not find the message. Please check:\n"
-                "• The message exists\n"
-                "• The link is correct\n"
-                "• Bot has access to the channel",
-                parse_mode=ParseMode.MARKDOWN
-            )
-            return
-        
-        # Store the original message info for editing
-        user_data["edit_chat_id"] = chat_id
-        user_data["edit_message_id"] = message_id
-        user_data["original_content"] = post_content
-        
-        # Load the content into current post data
-        user_data["text"] = post_content.get("text", "")
-        user_data["media"] = post_content.get("media", [])
-        user_data["buttons"] = post_content.get("buttons", [])
-        user_data["state"] = "editing_post"
-        
-        set_user_data(message.from_user.id, user_data)
-        
-        # Show the post content and edit options
-        await show_post_content_and_edit_options(message, post_content, selected_channel)
-        
-    except Exception as e:
-        await message.reply(
-            f" **Error Loading Post**\n\n"
-            f"Error: {str(e)}\n\n"
-            "Please make sure:\n"
-            "• The message exists\n"
-            "• Bot has admin access to the channel\n"
-            "• The link is correct",
-            parse_mode=ParseMode.MARKDOWN
-        )
-
-
-async def verify_channel_match(message_chat_id: str, selected_channel: dict) -> bool:
-    """Verify that the message link belongs to the selected channel"""
-    logger.info(f"Verifying channel match:")
-    logger.info(f"  Message Chat ID: {message_chat_id}")
-    logger.info(f"  Selected Channel: {selected_channel}")
-    
-    channel_chat_id = str(selected_channel.get("chat_id", ""))
-    channel_username = selected_channel.get("username", "")
-    
-    logger.info(f"  Channel Chat ID: {channel_chat_id}")
-    logger.info(f"  Channel Username: {channel_username}")
-    
-    # Direct chat_id match
-    if channel_chat_id == message_chat_id:
-        logger.info(f"   Direct chat_id match: {channel_chat_id} == {message_chat_id}")
-        return True
-    
-    # Username match (for public channels)
-    if channel_username == message_chat_id:
-        logger.info(f"   Username match: {channel_username} == {message_chat_id}")
-        return True
-        
-    # Username without @ symbol
-    if message_chat_id.startswith("@") and channel_username == message_chat_id[1:]:
-        logger.info(f"   Username match (without @): {channel_username} == {message_chat_id[1:]}")
-        return True
-        
-    # Chat ID with @ prefix
-    if message_chat_id.startswith("@") and channel_chat_id == message_chat_id[1:]:
-        logger.info(f"   Chat ID match (with @): {channel_chat_id} == {message_chat_id[1:]}")
-        return True
-    
-    logger.warning(f"   No match found between message_chat_id '{message_chat_id}' and channel (chat_id: '{channel_chat_id}', username: '{channel_username}')")
-    return False
-
-
-async def show_post_content_and_edit_options(message: types.Message, content: dict, channel: dict):
-    """Show the current post content and edit options"""
-    channel_name = channel.get("title", channel.get("username", "Unknown Channel"))
-    
-    # Build content display
-    content_text = f" **EDITING POST FROM {channel_name.upper()}**\n\n"
-    content_text += " **CURRENT POST CONTENT:**\n\n"
-    
-    # Show text content
-    if content.get("text"):
-        preview_text = content["text"]
-        if len(preview_text) > 300:
-            preview_text = preview_text[:300] + "..."
-        content_text += f"** Text:**\n{preview_text}\n\n"
-    else:
-        content_text += "** Text:** _No text content_\n\n"
-    
-    # Show media info
-    if content.get("media"):
-        media_count = len(content["media"])
-        media_types = [m["type"] for m in content["media"]]
-        content_text += f"** Media:** {media_count} file(s)\n"
-        content_text += f"**Types:** {', '.join(set(media_types))}\n\n"
-    else:
-        content_text += "** Media:** _No media files_\n\n"
-    
-    # Show buttons info
-    if content.get("buttons"):
-        button_count = len(content["buttons"])
-        content_text += f"** Buttons:** {button_count} button(s)\n"
-        for i, btn in enumerate(content["buttons"][:3]):  # Show first 3 buttons
-            content_text += f"  {i+1}. {btn['text']}\n"
-        if len(content["buttons"]) > 3:
-            content_text += f"  ... and {len(content['buttons']) - 3} more\n"
-        content_text += "\n"
-    else:
-        content_text += "** Buttons:** _No buttons_\n\n"
-    
-    content_text += "** What would you like to edit?**"
-    
-    # Create edit options keyboard
-    keyboard = []
-    
-    # Edit options
-    if content.get("text"):
-        keyboard.append([InlineKeyboardButton(text="Edit Text", callback_data="edit_text")])
-    else:
-        keyboard.append([InlineKeyboardButton(text="Add Text", callback_data="edit_text")])
-    
-    keyboard.append([InlineKeyboardButton(text="Edit Media", callback_data="edit_media")])
-    keyboard.append([InlineKeyboardButton(text="Edit Buttons", callback_data="edit_buttons")])
-    
-    # Special section for posts without buttons - add quick action buttons
-    if not content.get("buttons"):
-        content_text += "\n\n **This post has no buttons. Quick actions:**"
-        keyboard.append([
-            InlineKeyboardButton(text="Add Button", callback_data="quick_add_button"),
-            InlineKeyboardButton(text="Add Media", callback_data="quick_add_media")
-        ])
-        if not content.get("text"):
-            keyboard.append([InlineKeyboardButton(text="Add Text", callback_data="quick_add_text")])
-    
-    # Separator line if quick actions were added
-    if not content.get("buttons"):
-        keyboard.append([InlineKeyboardButton(text="", callback_data="separator")])
-    
-    # Message actions
-    keyboard.append([
-        InlineKeyboardButton(text="Pin Message", callback_data="pin_message"),
-        InlineKeyboardButton(text="Unpin Message", callback_data="unpin_message")
-    ])
-    
-    keyboard.append([
-        InlineKeyboardButton(text="Delete Message", callback_data="delete_message"),
-        InlineKeyboardButton(text="More Options", callback_data="more_options")
-    ])
-    
-    # Action buttons
-    keyboard.append([
-        InlineKeyboardButton(text="Save Changes", callback_data="save_edit")
-    ])
-    
-    keyboard.append([InlineKeyboardButton(text="Cancel Edit", callback_data="cancel_edit")])
-    
     await message.reply(
-        content_text,
-        parse_mode=ParseMode.MARKDOWN,
+        "<b>Edit Post</b>\n\n"
+        "Select a channel to edit a post from:",
+        parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
     )
+    
+    # Initialize session
+    clear_user_data(message.from_user.id)
+    set_user_data(message.from_user.id, {"state": "selecting_channel"})
 
-
-async def parse_message_link(link: str) -> tuple:
-    """Parse message link to extract chat_id and message_id"""
-    logger.info(f"Parsing message link: {link}")
-    
-    # Pattern for private channels: https://t.me/c/1234567890/123 (check this first)
-    private_pattern = r"^https://t\.me/c/(\d+)/(\d+)$"
-    
-    # Pattern for public channels: https://t.me/channelname/123 (check this second)
-    public_pattern = r"^https://t\.me/([^/c][^/]*)/(\d+)$"
-    
-    # Try private pattern first
-    private_match = re.match(private_pattern, link)
-    if private_match:
-        chat_id = f"-100{private_match.group(1)}"  # Add -100 prefix for supergroups/channels
-        message_id = int(private_match.group(2))
-        logger.info(f"Parsed as private channel - Chat ID: {chat_id}, Message ID: {message_id}")
-        return chat_id, message_id
-    
-    # Try public pattern second
-    public_match = re.match(public_pattern, link)
-    if public_match:
-        channel_username = public_match.group(1)
-        message_id = int(public_match.group(2))
-        result_chat_id = f"@{channel_username}"
-        logger.info(f"Parsed as public channel - Username: {channel_username}, Message ID: {message_id}, Result Chat ID: {result_chat_id}")
-        return result_chat_id, message_id
-    
-    logger.warning(f"Failed to parse message link: {link}")
-    return None, None
-
-
-async def get_message_content(bot, chat_id: str, message_id: int, user_id: int) -> dict:
-    """Get message content from Telegram"""
-    try:
-        # Get the original message
-        original_message = await bot.forward_message(
-            chat_id=user_id,  # Forward to user's private chat temporarily
-            from_chat_id=chat_id,
-            message_id=message_id
-        )
-        
-        # Extract content from the forwarded message
-        content = {
-            "text": "",
-            "media": [],
-            "buttons": []
-        }
-        
-        # Extract text
-        if original_message.text:
-            content["text"] = original_message.text
-        elif original_message.caption:
-            content["text"] = original_message.caption
-        
-        # Extract media
-        if original_message.photo:
-            content["media"].append({
-                "type": "photo",
-                "file_id": original_message.photo[-1].file_id,
-                "caption": original_message.caption or ""
-            })
-        elif original_message.video:
-            content["media"].append({
-                "type": "video",
-                "file_id": original_message.video.file_id,
-                "caption": original_message.caption or ""
-            })
-        elif original_message.document:
-            content["media"].append({
-                "type": "document",
-                "file_id": original_message.document.file_id,
-                "caption": original_message.caption or ""
-            })
-        elif original_message.animation:
-            content["media"].append({
-                "type": "animation",
-                "file_id": original_message.animation.file_id,
-                "caption": original_message.caption or ""
-            })
-        
-        # Extract buttons from reply markup
-        if original_message.reply_markup and hasattr(original_message.reply_markup, 'inline_keyboard'):
-            for row in original_message.reply_markup.inline_keyboard:
-                for button in row:
-                    if button.url:  # Only URL buttons
-                        content["buttons"].append({
-                            "text": button.text,
-                            "url": button.url
-                        })
-        
-        # Delete the forwarded message
-        try:
-            await bot.delete_message(chat_id=user_id, message_id=original_message.message_id)
-        except:
-            pass  # Ignore if deletion fails
-        
-        return content
-        
-    except Exception as e:
-        print(f"Error getting message content: {e}")
-        
-        # Fallback: return template for manual entry
-        return {
-            "text": " **Content Extraction Failed**\n\nPlease manually update the content using the edit options below.\n\n **Tip:** Copy your original message content and paste it when editing.",
-            "media": [],
-            "buttons": []
-        }
-
-
-# Edit text callback
-@router.callback_query(lambda query: query.data == "edit_text")
-async def handle_edit_text(query: types.CallbackQuery):
-    """Handle edit text action"""
-    await query.answer()
-    
-    user_data = get_user_data(query.from_user.id)
-    current_text = user_data.get("text", "")
-    
-    user_data["state"] = "editing_text"
-    set_user_data(query.from_user.id, user_data)
-    
-    if current_text:
-        preview = f"**Current text:**\n{current_text[:500]}{'...' if len(current_text) > 500 else ''}"
-    else:
-        preview = "**No text currently**"
-    
-    await query.message.edit_text(
-        f" **Edit Text Content**\n\n"
-        f"{preview}\n\n"
-        f" **Send the new text content:**",
-        parse_mode=ParseMode.MARKDOWN,
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
-        ])
-    )
-
-
-# Edit media callback
-@router.callback_query(lambda query: query.data == "edit_media")
-async def handle_edit_media(query: types.CallbackQuery):
-    """Handle edit media action"""
-    await query.answer()
-    
-    user_data = get_user_data(query.from_user.id)
-    current_media = user_data.get("media", [])
-    
-    user_data["state"] = "editing_media"
-    set_user_data(query.from_user.id, user_data)
-    
-    media_info = f"**Current media:** {len(current_media)} file(s)" if current_media else "**No media currently**"
-    
-    await query.message.edit_text(
-        f" **Edit Media Content**\n\n"
-        f"{media_info}\n\n"
-        f" **Send new media files (photos, videos, documents):**\n"
-        f"You can send multiple files. Send /done when finished.",
-        parse_mode=ParseMode.MARKDOWN,
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Remove All Media", callback_data="remove_all_media")],
-            [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
-        ])
-    )
-
-
-# Edit buttons callback
-@router.callback_query(lambda query: query.data == "edit_buttons")
-async def handle_edit_buttons(query: types.CallbackQuery):
-    """Handle edit buttons action"""
-    await query.answer()
-    
-    user_data = get_user_data(query.from_user.id)
-    current_buttons = user_data.get("buttons", [])
-    
-    user_data["state"] = "editing_buttons"
-    set_user_data(query.from_user.id, user_data)
-    
-    buttons_info = ""
-    if current_buttons:
-        buttons_info = f"**Current buttons:**\n"
-        for i, btn in enumerate(current_buttons, 1):
-            buttons_info += f"{i}. {btn['text']} → {btn['url']}\n"
-    else:
-        buttons_info = "**No buttons currently**"
-    
-    await query.message.edit_text(
-        f" **Edit Buttons**\n\n"
-        f"{buttons_info}\n\n"
-        f"**Send buttons in format:**\n"
-        f"`Text1 - URL1 | Text2 - URL2`\n\n"
-        f"**Example:**\n"
-        f"`Visit Website - https://example.com | Join Channel - https://t.me/channel`",
-        parse_mode=ParseMode.MARKDOWN,
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Remove All Buttons", callback_data="remove_all_buttons")],
-            [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
-        ])
-    )
-
-
-# Back to edit menu
-@router.callback_query(lambda query: query.data == "back_to_edit_menu")
-async def handle_back_to_edit_menu(query: types.CallbackQuery):
-    """Go back to edit menu"""
-    await query.answer()
-    
-    user_data = get_user_data(query.from_user.id)
-    selected_channel = user_data.get("selected_channel", {})
-    
-    user_data["state"] = "editing_post"
-    set_user_data(query.from_user.id, user_data)
-    
-    await show_post_content_and_edit_options(query.message, {
-        "text": user_data.get("text", ""),
-        "media": user_data.get("media", []),
-        "buttons": user_data.get("buttons", [])
-    }, selected_channel)
-
-
-# Preview changes
-@router.callback_query(lambda query: query.data == "preview_edit")
-async def handle_preview_edit(query: types.CallbackQuery):
-    """Preview the edited post"""
-    await query.answer()
-    
-    from .preview_publish import show_post_preview
-    user_data = get_user_data(query.from_user.id)
-    
-    # Temporarily change state to preview
-    original_state = user_data.get("state")
-    user_data["state"] = "preview"
-    set_user_data(query.from_user.id, user_data)
-    
-    await show_post_preview(query.message, is_edit_preview=True)
-    
-    # Restore original state
-    user_data["state"] = original_state
-    set_user_data(query.from_user.id, user_data)
-
-
-# Save changes
-@router.callback_query(lambda query: query.data == "save_edit")
-async def handle_save_edit(query: types.CallbackQuery):
-    """Save the edited post"""
-    await query.answer()
-    
-    user_data = get_user_data(query.from_user.id)
-    
-    chat_id = user_data.get("edit_chat_id")
-    message_id = user_data.get("edit_message_id")
-    selected_channel = user_data.get("selected_channel", {})
-    channel_name = selected_channel.get("title", selected_channel.get("username", "Unknown"))
-    
-    if not chat_id or not message_id:
-        await query.message.edit_text(
-            " **Error**\n\nEdit session expired. Please start over.",
-            parse_mode=ParseMode.MARKDOWN
-        )
-        return
-    
-    try:
-        # Update the message
-        success = await update_channel_message(query.message.bot, chat_id, message_id, user_data)
-        
-        if success:
-            await query.message.edit_text(
-                f" **Post Updated Successfully!**\n\n"
-                f"Your changes have been saved to **{channel_name}**.\n\n"
-                f" **Updated Message:** [View Post]({user_data.get('message_link', '#')})",
-                parse_mode=ParseMode.MARKDOWN
-            )
-            
-            # Clear edit data
-            clear_user_data(query.from_user.id)
-        else:
-            await query.message.edit_text(
-                " **Update Failed**\n\n"
-                "Could not update the post. Please check:\n"
-                "• Bot has admin rights in the channel\n"
-                "• The message still exists\n"
-                "• You have permission to edit",
-                parse_mode=ParseMode.MARKDOWN
-            )
-    
-    except Exception as e:
-        await query.message.edit_text(
-            f" **Update Error**\n\n"
-            f"Error: {str(e)}",
-            parse_mode=ParseMode.MARKDOWN
-        )
-
-
-# Cancel edit
 @router.callback_query(lambda query: query.data == "cancel_edit")
 async def handle_cancel_edit(query: types.CallbackQuery):
     """Cancel the edit process"""
-    await query.answer()
-    
     clear_user_data(query.from_user.id)
-    
-    await query.message.edit_text(
-        " **Edit Cancelled**\n\n"
-        "No changes were made to your post.",
-        parse_mode=ParseMode.MARKDOWN
-    )
+    await query.message.edit_text("Edit cancelled.")
+    await query.answer("Cancelled")
 
-
-# Remove all media
-@router.callback_query(lambda query: query.data == "remove_all_media")
-async def handle_remove_all_media(query: types.CallbackQuery):
-    """Remove all media from post"""
-    await query.answer()
+@router.callback_query(lambda query: query.data.startswith("edit_channel_"))
+async def handle_channel_selection(query: types.CallbackQuery):
+    """Handle channel selection for editing"""
+    chat_id = query.data.replace("edit_channel_", "")
     
+    # Verify user has access to this channel
+    user = await db.users.find_one({"user_id": query.from_user.id})
+    connected_channels = user.get("connected_channels", [])
+    
+    selected_channel = None
+    for channel in connected_channels:
+        if str(channel.get('chat_id')) == str(chat_id):
+            selected_channel = channel
+            break
+    
+    if not selected_channel:
+        await query.answer("Channel not found in your connected channels.", show_alert=True)
+        return
+    
+    # Save selected channel to session
     user_data = get_user_data(query.from_user.id)
-    user_data["media"] = []
+    user_data["selected_channel"] = selected_channel
+    user_data["edit_chat_id"] = chat_id
+    user_data["state"] = "selecting_post"
     set_user_data(query.from_user.id, user_data)
     
-    await query.answer(" All media removed", show_alert=True)
+    channel_title = html.escape(selected_channel.get('title', 'Unknown'))
+    
+    await query.message.edit_text(
+        f"<b>Channel: {channel_title}</b>\n\n"
+        "Please forward the message you want to edit from this channel to this chat.\n"
+        "Or send the link to the post.",
+        parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Back", callback_data="back_to_channels")],
+            [InlineKeyboardButton(text="Cancel", callback_data="cancel_edit")]
+        ])
+    )
+    await query.answer()
+
+@router.callback_query(lambda query: query.data == "back_to_channels")
+async def handle_back_to_channels(query: types.CallbackQuery):
+    """Go back to channel selection"""
+    # Re-use the cmd_edit_post logic but editing the message
+    user = await db.users.find_one({"user_id": query.from_user.id})
+    connected_channels = user.get("connected_channels", [])
+    
+    keyboard = []
+    for channel in connected_channels:
+        title = channel.get('title', channel.get('username', 'Unknown'))
+        if len(title) > 30:
+            title = title[:27] + "..."
+        callback_data = f"edit_channel_{channel.get('chat_id')}"
+        keyboard.append([InlineKeyboardButton(text=title, callback_data=callback_data)])
+    
+    keyboard.append([InlineKeyboardButton(text="Cancel", callback_data="cancel_edit")])
+    
+    await query.message.edit_text(
+        "<b>Edit Post</b>\n\n"
+        "Select a channel to edit a post from:",
+        parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
+    )
+    
+    user_data = get_user_data(query.from_user.id)
+    user_data["state"] = "selecting_channel"
+    set_user_data(query.from_user.id, user_data)
+
+@router.message(lambda message: get_user_data(message.from_user.id).get("state") == "selecting_post")
+async def handle_post_input(message: types.Message):
+    """Handle the forwarded post or link"""
+    user_data = get_user_data(message.from_user.id)
+    chat_id = user_data.get("edit_chat_id")
+    
+    message_id = None
+    
+    # Check if forwarded
+    if message.forward_from_chat:
+        if str(message.forward_from_chat.id) == str(chat_id):
+            message_id = message.forward_from_message_id
+        else:
+            await message.reply(
+                "<b>Wrong Channel</b>\n\n"
+                "This message is forwarded from a different channel.\n"
+                "Please forward from the channel you selected.",
+                parse_mode=ParseMode.HTML
+            )
+            return
+    
+    # Check if link
+    elif message.text and "t.me/" in message.text:
+        try:
+            # Extract message ID from link
+            # Format: https://t.me/channelname/123 or https://t.me/c/1234567890/123
+            parts = message.text.strip().split('/')
+            if parts[-1].isdigit():
+                message_id = int(parts[-1])
+        except:
+            pass
+    
+    if not message_id:
+        await message.reply(
+            "<b>Invalid Post</b>\n\n"
+            "Could not identify the post.\n"
+            "Please forward the message from the channel or send a valid link.",
+            parse_mode=ParseMode.HTML
+        )
+        return
+    
+    # Save message ID
+    user_data["edit_message_id"] = message_id
+    user_data["state"] = "loading_post"
+    set_user_data(message.from_user.id, user_data)
+    
+    status_msg = await message.reply("Loading post content...")
+    
+    # Fetch post content (we can't actually fetch content via bot API unless we have it stored)
+    # But we can ask the user to confirm what they want to edit
+    
+    # In a real scenario, we might have the post stored in DB if we created it
+    # Or we just start with empty/unknown content and let user overwrite
+    
+    # Try to find in DB first
+    db_post = await db.posts.find_one({
+        "channel_id": int(chat_id) if chat_id.lstrip('-').isdigit() else chat_id,
+        "message_id": message_id
+    })
+    
+    content = {}
+    if db_post:
+        content = {
+            "text": db_post.get("content", ""),
+            "media": db_post.get("media", []),
+            "buttons": db_post.get("buttons", [])
+        }
+    else:
+        # If forwarded, we might have content
+        if message.forward_from_chat:
+            content = {
+                "text": message.text or message.caption or "",
+                "media": [], # Can't easily get media from forward without downloading
+                "buttons": []
+            }
+    
+    user_data["original_content"] = content
+    user_data["text"] = content.get("text", "")
+    user_data["media"] = content.get("media", [])
+    user_data["buttons"] = content.get("buttons", [])
+    user_data["state"] = "editing_post"
+    set_user_data(message.from_user.id, user_data)
+    
+    await status_msg.delete()
+    await show_post_content_and_edit_options(message, content, user_data.get("selected_channel"))
+
+async def show_post_content_and_edit_options(message, content, channel):
+    """Show post content and edit options"""
+    text_preview = content.get("text", "")
+    if len(text_preview) > 200:
+        text_preview = text_preview[:197] + "..."
+    
+    safe_text_preview = html.escape(text_preview) if text_preview else "<i>No text content</i>"
+    channel_title = html.escape(channel.get('title', 'Unknown'))
+    
+    media_count = len(content.get("media", []))
+    buttons_count = len(content.get("buttons", []))
+    
+    info_text = (
+        f"<b>Editing Post</b>\n\n"
+        f"<b>Channel:</b> {channel_title}\n"
+        f"<b>Message ID:</b> {get_user_data(message.from_user.id).get('edit_message_id')}\n\n"
+        f"<b>Current Content:</b>\n"
+        f"{safe_text_preview}\n\n"
+        f"<b>Media:</b> {media_count} files\n"
+        f"<b>Buttons:</b> {buttons_count} buttons\n\n"
+        f"<b>Select what to edit:</b>"
+    )
+    
+    keyboard = [
+        [
+            InlineKeyboardButton(text="Edit Text", callback_data="edit_text"),
+            InlineKeyboardButton(text="Edit Media", callback_data="edit_media")
+        ],
+        [
+            InlineKeyboardButton(text="Edit Buttons", callback_data="edit_buttons"),
+            InlineKeyboardButton(text="Preview", callback_data="preview_edit")
+        ],
+        [
+            InlineKeyboardButton(text="Save Changes", callback_data="save_changes"),
+            InlineKeyboardButton(text="Cancel", callback_data="cancel_edit")
+        ],
+        [
+            InlineKeyboardButton(text="More Options", callback_data="more_options")
+        ]
+    ]
+    
+    await message.answer(
+        info_text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
+    )
+
+@router.callback_query(lambda query: query.data == "back_to_edit_menu")
+async def handle_back_to_edit_menu(query: types.CallbackQuery):
+    """Return to the main edit menu"""
+    user_data = get_user_data(query.from_user.id)
+    content = {
+        "text": user_data.get("text", ""),
+        "media": user_data.get("media", []),
+        "buttons": user_data.get("buttons", [])
+    }
+    
+    # We need to call show_post_content_and_edit_options but it expects a message
+    # So we'll manually edit the current message
+    
+    text_preview = content.get("text", "")
+    if len(text_preview) > 200:
+        text_preview = text_preview[:197] + "..."
+        
+    safe_text_preview = html.escape(text_preview) if text_preview else "<i>No text content</i>"
+    channel_title = html.escape(user_data.get("selected_channel", {}).get('title', 'Unknown'))
+    
+    media_count = len(content.get("media", []))
+    buttons_count = len(content.get("buttons", []))
+    
+    info_text = (
+        f"<b>Editing Post</b>\n\n"
+        f"<b>Channel:</b> {channel_title}\n"
+        f"<b>Message ID:</b> {user_data.get('edit_message_id')}\n\n"
+        f"<b>Current Content:</b>\n"
+        f"{safe_text_preview}\n\n"
+        f"<b>Media:</b> {media_count} files\n"
+        f"<b>Buttons:</b> {buttons_count} buttons\n\n"
+        f"<b>Select what to edit:</b>"
+    )
+    
+    keyboard = [
+        [
+            InlineKeyboardButton(text="Edit Text", callback_data="edit_text"),
+            InlineKeyboardButton(text="Edit Media", callback_data="edit_media")
+        ],
+        [
+            InlineKeyboardButton(text="Edit Buttons", callback_data="edit_buttons"),
+            InlineKeyboardButton(text="Preview", callback_data="preview_edit")
+        ],
+        [
+            InlineKeyboardButton(text="Save Changes", callback_data="save_changes"),
+            InlineKeyboardButton(text="Cancel", callback_data="cancel_edit")
+        ],
+        [
+            InlineKeyboardButton(text="More Options", callback_data="more_options")
+        ]
+    ]
+    
+    await query.message.edit_text(
+        info_text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
+    )
+
+@router.callback_query(lambda query: query.data == "edit_text")
+async def handle_edit_text(query: types.CallbackQuery):
+    """Handle edit text option"""
+    user_data = get_user_data(query.from_user.id)
+    user_data["state"] = "editing_text"
+    set_user_data(query.from_user.id, user_data)
+    
+    current_text = user_data.get("text", "")
+    safe_text = html.escape(current_text) if current_text else "<i>No text content</i>"
+    
+    await query.message.edit_text(
+        f"<b>Edit Text</b>\n\n"
+        f"Current text:\n{safe_text}\n\n"
+        "Please send the new text for the post.\n"
+        "You can use HTML formatting.",
+        parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Keep Current Text", callback_data="back_to_edit_menu")],
+            [InlineKeyboardButton(text="Clear Text", callback_data="clear_text")]
+        ])
+    )
+    await query.answer()
+
+@router.callback_query(lambda query: query.data == "clear_text")
+async def handle_clear_text(query: types.CallbackQuery):
+    """Clear text content"""
+    user_data = get_user_data(query.from_user.id)
+    user_data["text"] = ""
+    set_user_data(query.from_user.id, user_data)
+    
+    await query.answer("Text cleared")
     await handle_back_to_edit_menu(query)
 
-
-# Remove all buttons
-@router.callback_query(lambda query: query.data == "remove_all_buttons")
-async def handle_remove_all_buttons(query: types.CallbackQuery):
-    """Remove all buttons from post"""
-    await query.answer()
+@router.callback_query(lambda query: query.data == "edit_buttons")
+async def handle_edit_buttons(query: types.CallbackQuery):
+    """Handle edit buttons option"""
+    user_data = get_user_data(query.from_user.id)
+    user_data["state"] = "editing_buttons"
+    set_user_data(query.from_user.id, user_data)
     
+    current_buttons = user_data.get("buttons", [])
+    buttons_text = ""
+    for btn in current_buttons:
+        buttons_text += f"• {html.escape(btn['text'])} - {html.escape(btn['url'])}\n"
+    
+    if not buttons_text:
+        buttons_text = "<i>No buttons</i>"
+    
+    await query.message.edit_text(
+        f"<b>Edit Buttons</b>\n\n"
+        f"Current buttons:\n{buttons_text}\n\n"
+        "Send new buttons in format:\n"
+        "<code>Text - URL | Text 2 - URL 2</code>\n\n"
+        "Example:\n"
+        "<code>Visit Site - https://example.com | Join Channel - https://t.me/channel</code>",
+        parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Keep Current Buttons", callback_data="back_to_edit_menu")],
+            [InlineKeyboardButton(text="Clear Buttons", callback_data="clear_buttons")]
+        ])
+    )
+    await query.answer()
+
+@router.callback_query(lambda query: query.data == "clear_buttons")
+async def handle_clear_buttons(query: types.CallbackQuery):
+    """Clear buttons content"""
     user_data = get_user_data(query.from_user.id)
     user_data["buttons"] = []
     set_user_data(query.from_user.id, user_data)
     
-    await query.answer(" All buttons removed", show_alert=True)
+    await query.answer("Buttons cleared")
     await handle_back_to_edit_menu(query)
 
+@router.callback_query(lambda query: query.data == "edit_media")
+async def handle_edit_media(query: types.CallbackQuery):
+    """Handle edit media option"""
+    user_data = get_user_data(query.from_user.id)
+    user_data["state"] = "editing_media"
+    set_user_data(query.from_user.id, user_data)
+    
+    current_media = user_data.get("media", [])
+    media_text = f"{len(current_media)} files" if current_media else "<i>No media</i>"
+    
+    await query.message.edit_text(
+        f"<b>Edit Media</b>\n\n"
+        f"Current media: {media_text}\n\n"
+        "Send new media files to replace existing media.\n"
+        "Send <code>/done</code> when finished adding media.",
+        parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Keep Current Media", callback_data="back_to_edit_menu")],
+            [InlineKeyboardButton(text="Clear Media", callback_data="clear_media")]
+        ])
+    )
+    await query.answer()
+
+@router.callback_query(lambda query: query.data == "clear_media")
+async def handle_clear_media(query: types.CallbackQuery):
+    """Clear media content"""
+    user_data = get_user_data(query.from_user.id)
+    user_data["media"] = []
+    set_user_data(query.from_user.id, user_data)
+    
+    await query.answer("Media cleared")
+    await handle_back_to_edit_menu(query)
+
+@router.callback_query(lambda query: query.data == "preview_edit")
+async def handle_preview_edit(query: types.CallbackQuery):
+    """Preview the edited post"""
+    user_data = get_user_data(query.from_user.id)
+    
+    text = user_data.get("text", "")
+    media = user_data.get("media", [])
+    buttons = user_data.get("buttons", [])
+    
+    # Create inline keyboard
+    keyboard = []
+    if buttons:
+        row = []
+        for btn in buttons:
+            row.append(InlineKeyboardButton(text=btn["text"], url=btn["url"]))
+            if len(row) == 2:
+                keyboard.append(row)
+                row = []
+        if row:
+            keyboard.append(row)
+    
+    # Add back button
+    keyboard.append([InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")])
+    
+    try:
+        if media:
+            # Send media preview
+            if len(media) == 1:
+                media_item = media[0]
+                if media_item["type"] == "photo":
+                    await query.message.answer_photo(
+                        photo=media_item["file_id"],
+                        caption=text,
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
+                    )
+                elif media_item["type"] == "video":
+                    await query.message.answer_video(
+                        video=media_item["file_id"],
+                        caption=text,
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
+                    )
+                elif media_item["type"] == "document":
+                    await query.message.answer_document(
+                        document=media_item["file_id"],
+                        caption=text,
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
+                    )
+                elif media_item["type"] == "animation":
+                    await query.message.answer_animation(
+                        animation=media_item["file_id"],
+                        caption=text,
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
+                    )
+            else:
+                # Multiple media - send as album
+                # Note: Albums can't have inline keyboards, so we send text separately if needed
+                # Or just show first item with caption
+                await query.message.answer("Previewing media group (showing first item)...")
+                media_item = media[0]
+                # ... simplified for preview
+                await query.message.answer_photo(
+                    photo=media_item["file_id"],
+                    caption=text,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
+                )
+        else:
+            # Text only
+            await query.message.answer(
+                text=text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard),
+                disable_web_page_preview=not user_data.get("link_preview", True)
+            )
+            
+        await query.answer()
+        
+    except Exception as e:
+        error_msg = html.escape(str(e))
+        await query.message.answer(
+            f"<b>Preview Failed</b>\n\nError: {error_msg}",
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
+            ])
+        )
+
+@router.callback_query(lambda query: query.data == "save_changes")
+async def handle_save_changes(query: types.CallbackQuery):
+    """Save changes to the channel"""
+    user_data = get_user_data(query.from_user.id)
+    chat_id = user_data.get("edit_chat_id")
+    message_id = user_data.get("edit_message_id")
+    
+    if not chat_id or not message_id:
+        await query.answer("Error: Missing chat or message ID", show_alert=True)
+        return
+    
+    await query.message.edit_text("Saving changes...")
+    
+    try:
+        success = await update_channel_message(
+            query.bot, 
+            chat_id, 
+            message_id, 
+            user_data
+        )
+        
+        if success:
+            channel_title = html.escape(user_data.get("selected_channel", {}).get('title', 'Unknown'))
+            await query.message.edit_text(
+                f"<b>Success!</b>\n\n"
+                f"Message in <b>{channel_title}</b> has been updated.",
+                parse_mode=ParseMode.HTML,
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="Edit Another Post", callback_data="back_to_channels")],
+                    [InlineKeyboardButton(text="Close", callback_data="cancel_edit")]
+                ])
+            )
+            
+            # Update DB if exists
+            # ...
+            
+            log_user_action(query.from_user.id, "EDIT_POST", f"Chat: {chat_id}, Msg: {message_id}")
+            
+        else:
+            await query.message.edit_text(
+                "<b>Update Failed</b>\n\n"
+                "Could not update the message. Please check bot permissions.",
+                parse_mode=ParseMode.HTML,
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="Try Again", callback_data="save_changes")],
+                    [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
+                ])
+            )
+            
+    except Exception as e:
+        error_msg = html.escape(str(e))
+        await query.message.edit_text(
+            f"<b>Error</b>\n\n{error_msg}",
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
+            ])
+        )
+        logger.error(f"Save changes error: {e}")
+
+def create_inline_buttons_keyboard(buttons):
+    """Helper to create inline keyboard from buttons list"""
+    if not buttons:
+        return None
+        
+    keyboard = []
+    row = []
+    for btn in buttons:
+        row.append(InlineKeyboardButton(text=btn["text"], url=btn["url"]))
+        if len(row) == 2:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
+        
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 # Pin message
 @router.callback_query(lambda query: query.data == "pin_message")
@@ -748,12 +623,12 @@ async def handle_pin_message(query: types.CallbackQuery):
     chat_id = user_data.get("edit_chat_id")
     message_id = user_data.get("edit_message_id")
     selected_channel = user_data.get("selected_channel", {})
-    channel_name = selected_channel.get("title", selected_channel.get("username", "Unknown"))
+    channel_name = html.escape(selected_channel.get("title", selected_channel.get("username", "Unknown")))
     
     if not chat_id or not message_id:
         await query.message.edit_text(
-            " **Error**\n\nNo message selected for pinning.",
-            parse_mode=ParseMode.MARKDOWN
+            "<b>Error</b>\n\nNo message selected for pinning.",
+            parse_mode=ParseMode.HTML
         )
         return
     
@@ -765,13 +640,12 @@ async def handle_pin_message(query: types.CallbackQuery):
         )
         
         await query.message.edit_text(
-            f" **Message Pinned Successfully!**\n\n"
-            f"The message has been pinned in **{channel_name}**.\n\n"
-            f" All channel subscribers will receive a notification about the pinned message.",
-            parse_mode=ParseMode.MARKDOWN,
+            f"<b>Message Pinned Successfully!</b>\n\n"
+            f"The message has been pinned in <b>{channel_name}</b>.",
+            parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")],
-                [InlineKeyboardButton(text="Close", callback_data="cancel_edit")]
+                [InlineKeyboardButton(text="Unpin Message", callback_data="unpin_message")],
+                [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
             ])
         )
         
@@ -779,27 +653,27 @@ async def handle_pin_message(query: types.CallbackQuery):
         error_msg = str(e)
         if "CHAT_ADMIN_REQUIRED" in error_msg:
             await query.message.edit_text(
-                f" **Pin Failed - Admin Rights Required**\n\n"
-                f"The bot needs admin rights in **{channel_name}** to pin messages.\n\n"
-                f"**Please make sure:**\n"
+                f"<b>Pin Failed - Admin Rights Required</b>\n\n"
+                f"The bot needs admin rights in <b>{channel_name}</b> to pin messages.\n\n"
+                f"<b>Please make sure:</b>\n"
                 f"• Bot is an admin in the channel\n"
                 f"• Bot has 'Pin Messages' permission",
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=ParseMode.HTML,
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
                 ])
             )
         else:
+            safe_error = html.escape(error_msg)
             await query.message.edit_text(
-                f" **Pin Failed**\n\n"
+                f"<b>Pin Failed</b>\n\n"
                 f"Could not pin the message.\n\n"
-                f"**Error:** {error_msg}",
-                parse_mode=ParseMode.MARKDOWN,
+                f"<b>Error:</b> {safe_error}",
+                parse_mode=ParseMode.HTML,
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
                 ])
             )
-
 
 # Unpin message
 @router.callback_query(lambda query: query.data == "unpin_message")
@@ -811,12 +685,12 @@ async def handle_unpin_message(query: types.CallbackQuery):
     chat_id = user_data.get("edit_chat_id")
     message_id = user_data.get("edit_message_id")
     selected_channel = user_data.get("selected_channel", {})
-    channel_name = selected_channel.get("title", selected_channel.get("username", "Unknown"))
+    channel_name = html.escape(selected_channel.get("title", selected_channel.get("username", "Unknown")))
     
     if not chat_id or not message_id:
         await query.message.edit_text(
-            " **Error**\n\nNo message selected for unpinning.",
-            parse_mode=ParseMode.MARKDOWN
+            "<b>Error</b>\n\nNo message selected for unpinning.",
+            parse_mode=ParseMode.HTML
         )
         return
     
@@ -827,9 +701,9 @@ async def handle_unpin_message(query: types.CallbackQuery):
         )
         
         await query.message.edit_text(
-            f" **Message Unpinned Successfully!**\n\n"
-            f"The message has been unpinned from **{channel_name}**.",
-            parse_mode=ParseMode.MARKDOWN,
+            f"<b>Message Unpinned Successfully!</b>\n\n"
+            f"The message has been unpinned from <b>{channel_name}</b>.",
+            parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")],
                 [InlineKeyboardButton(text="Close", callback_data="cancel_edit")]
@@ -840,22 +714,23 @@ async def handle_unpin_message(query: types.CallbackQuery):
         error_msg = str(e)
         if "CHAT_ADMIN_REQUIRED" in error_msg:
             await query.message.edit_text(
-                f" **Unpin Failed - Admin Rights Required**\n\n"
-                f"The bot needs admin rights in **{channel_name}** to unpin messages.\n\n"
-                f"**Please make sure:**\n"
+                f"<b>Unpin Failed - Admin Rights Required</b>\n\n"
+                f"The bot needs admin rights in <b>{channel_name}</b> to unpin messages.\n\n"
+                f"<b>Please make sure:</b>\n"
                 f"• Bot is an admin in the channel\n"
                 f"• Bot has 'Pin Messages' permission",
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=ParseMode.HTML,
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
                 ])
             )
         else:
+            safe_error = html.escape(error_msg)
             await query.message.edit_text(
-                f" **Unpin Failed**\n\n"
+                f"<b>Unpin Failed</b>\n\n"
                 f"Could not unpin the message.\n\n"
-                f"**Error:** {error_msg}",
-                parse_mode=ParseMode.MARKDOWN,
+                f"<b>Error:</b> {safe_error}",
+                parse_mode=ParseMode.HTML,
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
                 ])
@@ -870,14 +745,14 @@ async def handle_delete_message(query: types.CallbackQuery):
     
     user_data = get_user_data(query.from_user.id)
     selected_channel = user_data.get("selected_channel", {})
-    channel_name = selected_channel.get("title", selected_channel.get("username", "Unknown"))
+    channel_name = html.escape(selected_channel.get("title", selected_channel.get("username", "Unknown")))
     
     await query.message.edit_text(
-        f" **DELETE MESSAGE CONFIRMATION**\n\n"
-        f" **Warning:** This action cannot be undone!\n\n"
-        f"Are you sure you want to **permanently delete** this message from **{channel_name}**?\n\n"
+        f"<b>DELETE MESSAGE CONFIRMATION</b>\n\n"
+        f"<b>Warning:</b> This action cannot be undone!\n\n"
+        f"Are you sure you want to <b>permanently delete</b> this message from <b>{channel_name}</b>?\n\n"
         f"The message will be completely removed and cannot be recovered.",
-        parse_mode=ParseMode.MARKDOWN,
+        parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [
                 InlineKeyboardButton(text="Yes, Delete", callback_data="confirm_delete_message"),
@@ -897,12 +772,12 @@ async def handle_confirm_delete_message(query: types.CallbackQuery):
     chat_id = user_data.get("edit_chat_id")
     message_id = user_data.get("edit_message_id")
     selected_channel = user_data.get("selected_channel", {})
-    channel_name = selected_channel.get("title", selected_channel.get("username", "Unknown"))
+    channel_name = html.escape(selected_channel.get("title", selected_channel.get("username", "Unknown")))
     
     if not chat_id or not message_id:
         await query.message.edit_text(
-            " **Error**\n\nNo message selected for deletion.",
-            parse_mode=ParseMode.MARKDOWN
+            "<b>Error</b>\n\nNo message selected for deletion.",
+            parse_mode=ParseMode.HTML
         )
         return
     
@@ -913,10 +788,10 @@ async def handle_confirm_delete_message(query: types.CallbackQuery):
         )
         
         await query.message.edit_text(
-            f" **Message Deleted Successfully!**\n\n"
-            f"The message has been permanently deleted from **{channel_name}**.\n\n"
-            f" This action has been completed and cannot be undone.",
-            parse_mode=ParseMode.MARKDOWN
+            f"<b>Message Deleted Successfully!</b>\n\n"
+            f"The message has been permanently deleted from <b>{channel_name}</b>.\n\n"
+            f"This action has been completed and cannot be undone.",
+            parse_mode=ParseMode.HTML
         )
         
         # Clear user data since message is deleted
@@ -926,34 +801,35 @@ async def handle_confirm_delete_message(query: types.CallbackQuery):
         error_msg = str(e)
         if "CHAT_ADMIN_REQUIRED" in error_msg:
             await query.message.edit_text(
-                f" **Delete Failed - Admin Rights Required**\n\n"
-                f"The bot needs admin rights in **{channel_name}** to delete messages.\n\n"
-                f"**Please make sure:**\n"
+                f"<b>Delete Failed - Admin Rights Required</b>\n\n"
+                f"The bot needs admin rights in <b>{channel_name}</b> to delete messages.\n\n"
+                f"<b>Please make sure:</b>\n"
                 f"• Bot is an admin in the channel\n"
                 f"• Bot has 'Delete Messages' permission",
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=ParseMode.HTML,
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
                 ])
             )
         elif "MESSAGE_DELETE_FORBIDDEN" in error_msg:
             await query.message.edit_text(
-                f" **Delete Failed - Permission Denied**\n\n"
+                f"<b>Delete Failed - Permission Denied</b>\n\n"
                 f"Cannot delete this message. This usually happens when:\n\n"
                 f"• Message is too old (48+ hours)\n"
                 f"• You don't have permission to delete this message\n"
                 f"• The message was posted by someone else",
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=ParseMode.HTML,
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
                 ])
             )
         else:
+            safe_error = html.escape(error_msg)
             await query.message.edit_text(
-                f" **Delete Failed**\n\n"
+                f"<b>Delete Failed</b>\n\n"
                 f"Could not delete the message.\n\n"
-                f"**Error:** {error_msg}",
-                parse_mode=ParseMode.MARKDOWN,
+                f"<b>Error:</b> {safe_error}",
+                parse_mode=ParseMode.HTML,
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
                 ])
@@ -968,12 +844,12 @@ async def handle_more_options(query: types.CallbackQuery):
     
     user_data = get_user_data(query.from_user.id)
     selected_channel = user_data.get("selected_channel", {})
-    channel_name = selected_channel.get("title", selected_channel.get("username", "Unknown"))
+    channel_name = html.escape(selected_channel.get("title", selected_channel.get("username", "Unknown")))
     
     await query.message.edit_text(
-        f" **MORE OPTIONS - {channel_name}**\n\n"
-        f" **Advanced message management:**",
-        parse_mode=ParseMode.MARKDOWN,
+        f"<b>MORE OPTIONS - {channel_name}</b>\n\n"
+        f"<b>Advanced message management:</b>",
+        parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [
                 InlineKeyboardButton(text="Copy Message", callback_data="copy_message"),
@@ -1012,25 +888,26 @@ async def handle_copy_message(query: types.CallbackQuery):
     if original_content.get("media"):
         media_count = len(original_content["media"])
         media_types = [m["type"] for m in original_content["media"]]
-        media_info = f"\n\n **Media:** {media_count} file(s) ({', '.join(set(media_types))})"
+        media_info = f"\n\n<b>Media:</b> {media_count} file(s) ({', '.join(set(media_types))})"
     
     if original_content.get("buttons"):
-        buttons_info = f"\n\n **Buttons:**\n"
+        buttons_info = f"\n\n<b>Buttons:</b>\n"
         for btn in original_content["buttons"]:
-            buttons_info += f"• {btn['text']} → {btn['url']}\n"
+            buttons_info += f"• {html.escape(btn['text'])} → {html.escape(btn['url'])}\n"
     
-    copy_content = f" **MESSAGE CONTENT TO COPY:**\n\n"
+    copy_content = f"<b>MESSAGE CONTENT TO COPY:</b>\n\n"
     
     if text_content:
-        copy_content += f"**Text:**\n```\n{text_content}\n```"
+        safe_text = html.escape(text_content)
+        copy_content += f"<b>Text:</b>\n<pre>{safe_text}</pre>"
     else:
-        copy_content += "**Text:** _No text content_"
+        copy_content += "<b>Text:</b> <i>No text content</i>"
     
     copy_content += media_info + buttons_info
     
     await query.message.edit_text(
         copy_content,
-        parse_mode=ParseMode.MARKDOWN,
+        parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Back to More Options", callback_data="more_options")]
         ])
@@ -1047,11 +924,12 @@ async def handle_get_message_link(query: types.CallbackQuery):
     chat_id = user_data.get("edit_chat_id")
     message_id = user_data.get("edit_message_id")
     selected_channel = user_data.get("selected_channel", {})
+    channel_title = html.escape(selected_channel.get("title", "Unknown"))
     
     if not chat_id or not message_id:
         await query.message.edit_text(
-            " **Error**\n\nNo message selected.",
-            parse_mode=ParseMode.MARKDOWN
+            "<b>Error</b>\n\nNo message selected.",
+            parse_mode=ParseMode.HTML
         )
         return
     
@@ -1068,12 +946,12 @@ async def handle_get_message_link(query: types.CallbackQuery):
         message_link = f"https://t.me/c/{chat_id_numeric}/{message_id}"
     
     await query.message.edit_text(
-        f" **MESSAGE LINK**\n\n"
-        f"**Channel:** {selected_channel.get('title', 'Unknown')}\n"
-        f"**Message ID:** {message_id}\n\n"
-        f"**Link:**\n`{message_link}`\n\n"
-        f" **Tip:** Tap the link to copy it to your clipboard.",
-        parse_mode=ParseMode.MARKDOWN,
+        f"<b>MESSAGE LINK</b>\n\n"
+        f"<b>Channel:</b> {channel_title}\n"
+        f"<b>Message ID:</b> {message_id}\n\n"
+        f"<b>Link:</b>\n<code>{message_link}</code>\n\n"
+        f"<b>Tip:</b> Tap the link to copy it to your clipboard.",
+        parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Back to More Options", callback_data="more_options")]
         ])
@@ -1089,16 +967,17 @@ async def handle_message_stats(query: types.CallbackQuery):
     user_data = get_user_data(query.from_user.id)
     original_content = user_data.get("original_content", {})
     selected_channel = user_data.get("selected_channel", {})
+    channel_title = html.escape(selected_channel.get("title", "Unknown"))
     
     text_length = len(original_content.get("text", ""))
     media_count = len(original_content.get("media", []))
     button_count = len(original_content.get("buttons", []))
     
     stats_text = (
-        f" **MESSAGE STATISTICS**\n\n"
-        f"**Channel:** {selected_channel.get('title', 'Unknown')}\n"
-        f"**Message ID:** {user_data.get('edit_message_id', 'Unknown')}\n\n"
-        f"**Content Analysis:**\n"
+        f"<b>MESSAGE STATISTICS</b>\n\n"
+        f"<b>Channel:</b> {channel_title}\n"
+        f"<b>Message ID:</b> {user_data.get('edit_message_id', 'Unknown')}\n\n"
+        f"<b>Content Analysis:</b>\n"
         f"•  Text length: {text_length} characters\n"
         f"•  Media files: {media_count}\n"
         f"•  Buttons: {button_count}\n\n"
@@ -1107,11 +986,11 @@ async def handle_message_stats(query: types.CallbackQuery):
     if original_content.get("media"):
         media_types = [m["type"] for m in original_content["media"]]
         unique_types = list(set(media_types))
-        stats_text += f"**Media types:** {', '.join(unique_types)}\n"
+        stats_text += f"<b>Media types:</b> {', '.join(unique_types)}\n"
     
     await query.message.edit_text(
         stats_text,
-        parse_mode=ParseMode.MARKDOWN,
+        parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Back to More Options", callback_data="more_options")]
         ])
@@ -1135,10 +1014,10 @@ async def handle_advanced_features(query: types.CallbackQuery):
     feature_name = feature_names.get(query.data, "Feature")
     
     await query.message.edit_text(
-        f" **{feature_name}**\n\n"
+        f"<b>{feature_name}</b>\n\n"
         f"This feature is coming soon!\n\n"
-        f"Stay tuned for updates. ",
-        parse_mode=ParseMode.MARKDOWN,
+        f"Stay tuned for updates.",
+        parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Back to More Options", callback_data="more_options")]
         ])
@@ -1156,14 +1035,14 @@ async def handle_quick_add_button(query: types.CallbackQuery):
     set_user_data(query.from_user.id, user_data)
     
     await query.message.edit_text(
-        f" **Quick Add Button**\n\n"
-        f"**No buttons currently in this post**\n\n"
-        f"**Send buttons in format:**\n"
-        f"`Text1 - URL1 | Text2 - URL2`\n\n"
-        f"**Example:**\n"
-        f"`Visit Website - https://example.com | Join Channel - https://t.me/channel`\n\n"
-        f" **Tip:** Adding buttons makes your post more interactive!",
-        parse_mode=ParseMode.MARKDOWN,
+        f"<b>Quick Add Button</b>\n\n"
+        f"<b>No buttons currently in this post</b>\n\n"
+        f"<b>Send buttons in format:</b>\n"
+        f"<code>Text1 - URL1 | Text2 - URL2</code>\n\n"
+        f"<b>Example:</b>\n"
+        f"<code>Visit Website - https://example.com | Join Channel - https://t.me/channel</code>\n\n"
+        f"<b>Tip:</b> Adding buttons makes your post more interactive!",
+        parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
         ])
@@ -1180,15 +1059,15 @@ async def handle_quick_add_media(query: types.CallbackQuery):
     user_data["state"] = "editing_media"
     set_user_data(query.from_user.id, user_data)
     
-    media_info = f"**Current media:** {len(current_media)} file(s)" if current_media else "**No media currently**"
+    media_info = f"<b>Current media:</b> {len(current_media)} file(s)" if current_media else "<b>No media currently</b>"
     
     await query.message.edit_text(
-        f" **Quick Add Media**\n\n"
+        f"<b>Quick Add Media</b>\n\n"
         f"{media_info}\n\n"
-        f" **Send new media files (photos, videos, documents):**\n"
+        f"<b>Send new media files (photos, videos, documents):</b>\n"
         f"You can send multiple files. Send /done when finished.\n\n"
-        f" **Tip:** Media makes your posts more engaging and visual!",
-        parse_mode=ParseMode.MARKDOWN,
+        f"<b>Tip:</b> Media makes your posts more engaging and visual!",
+        parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Remove All Media", callback_data="remove_all_media")],
             [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
@@ -1206,15 +1085,15 @@ async def handle_quick_add_text(query: types.CallbackQuery):
     set_user_data(query.from_user.id, user_data)
     
     await query.message.edit_text(
-        f" **Quick Add Text**\n\n"
-        f"**No text currently in this post**\n\n"
-        f" **Send the text content for your post:**\n\n"
-        f" **Tip:** You can use HTML formatting:\n"
-        f"• `<b>bold</b>` for **bold text**\n"
-        f"• `<i>italic</i>` for *italic text*\n"
-        f"• `<code>code</code>` for `code text`\n"
-        f"• `<a href='url'>link text</a>` for links",
-        parse_mode=ParseMode.MARKDOWN,
+        f"<b>Quick Add Text</b>\n\n"
+        f"<b>No text currently in this post</b>\n\n"
+        f"<b>Send the text content for your post:</b>\n\n"
+        f"<b>Tip:</b> You can use HTML formatting:\n"
+        f"• <code>&lt;b&gt;bold&lt;/b&gt;</code> for <b>bold text</b>\n"
+        f"• <code>&lt;i&gt;italic&lt;/i&gt;</code> for <i>italic text</i>\n"
+        f"• <code>&lt;code&gt;code&lt;/code&gt;</code> for <code>code text</code>\n"
+        f"• <code>&lt;a href='url'&gt;link text&lt;/a&gt;</code> for links",
+        parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Back to Edit Menu", callback_data="back_to_edit_menu")]
         ])
@@ -1231,7 +1110,7 @@ async def handle_separator_click(query: types.CallbackQuery):
 @router.message(lambda message: 
     get_user_data(message.from_user.id).get("state") == "editing_text" and
     message.text and
-    message.text not in [" Back to Edit Menu"]
+    message.text not in ["Back to Edit Menu"]
 )
 async def process_edit_text_input(message: types.Message):
     """Process text input during edit mode"""
@@ -1240,10 +1119,13 @@ async def process_edit_text_input(message: types.Message):
     user_data["state"] = "editing_post"
     set_user_data(message.from_user.id, user_data)
     
+    safe_text = html.escape(message.text)
+    preview = safe_text[:100] + "..." if len(safe_text) > 100 else safe_text
+    
     await message.answer(
-        f" **Text Updated!**\n\n"
-        f"Preview: {message.text[:100]}{'...' if len(message.text) > 100 else ''}",
-        parse_mode=ParseMode.MARKDOWN
+        f"<b>Text Updated!</b>\n\n"
+        f"Preview: {preview}",
+        parse_mode=ParseMode.HTML
     )
     
     # Go back to edit menu
@@ -1297,17 +1179,17 @@ async def process_edit_media_input(message: types.Message):
         media_count = len(user_data["media"])
         
         await message.answer(
-            f" **Media Added!**\n\n"
+            f"<b>Media Added!</b>\n\n"
             f"Total media files: {media_count}\n"
             f"You can send more media or use the buttons below to continue.",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=ParseMode.HTML
         )
 
 
 @router.message(lambda message: 
     get_user_data(message.from_user.id).get("state") == "editing_buttons" and
     message.text and
-    message.text not in [" Back to Edit Menu"]
+    message.text not in ["Back to Edit Menu"]
 )
 async def process_edit_buttons_input(message: types.Message):
     """Process buttons input during edit mode"""
@@ -1346,19 +1228,22 @@ async def process_edit_buttons_input(message: types.Message):
                         "url": url
                     })
                 else:
+                    safe_text = html.escape(button_text)
+                    safe_url = html.escape(url)
                     await message.answer(
-                        f" **Invalid URL format for button:** {button_text}\n"
-                        f"URL: {url}\n\n"
+                        f"<b>Invalid URL format for button:</b> {safe_text}\n"
+                        f"URL: {safe_url}\n\n"
                         f"Please check the format and try again.",
-                        parse_mode=ParseMode.MARKDOWN
+                        parse_mode=ParseMode.HTML
                     )
                     return
             else:
+                safe_pair = html.escape(pair)
                 await message.answer(
-                    f" **Invalid format for:** {pair}\n\n"
+                    f"<b>Invalid format for:</b> {safe_pair}\n\n"
                     f"Use format: Button Text - URL\n"
                     f"Example: Visit Site - https://example.com",
-                    parse_mode=ParseMode.MARKDOWN
+                    parse_mode=ParseMode.HTML
                 )
                 return
         
@@ -1368,12 +1253,12 @@ async def process_edit_buttons_input(message: types.Message):
             user_data["state"] = "editing_post"
             set_user_data(message.from_user.id, user_data)
             
-            buttons_summary = "\n".join([f"• {btn['text']} → {btn['url']}" for btn in parsed_buttons])
+            buttons_summary = "\n".join([f"• {html.escape(btn['text'])} → {html.escape(btn['url'])}" for btn in parsed_buttons])
             
             await message.answer(
-                f" **{len(parsed_buttons)} Button(s) Updated!**\n\n"
+                f"<b>{len(parsed_buttons)} Button(s) Updated!</b>\n\n"
                 f"Updated buttons:\n{buttons_summary}",
-                parse_mode=ParseMode.MARKDOWN
+                parse_mode=ParseMode.HTML
             )
             
             # Go back to edit menu
@@ -1385,18 +1270,19 @@ async def process_edit_buttons_input(message: types.Message):
             }, selected_channel)
         else:
             await message.answer(
-                " **No valid buttons found**\n\n"
+                "<b>No valid buttons found</b>\n\n"
                 "Please check the format and try again.",
-                parse_mode=ParseMode.MARKDOWN
+                parse_mode=ParseMode.HTML
             )
     
     except Exception as e:
+        error_msg = html.escape(str(e))
         await message.answer(
-            f" **Error parsing buttons**\n\n"
-            f"Error: {str(e)}\n\n"
+            f"<b>Error parsing buttons</b>\n\n"
+            f"Error: {error_msg}\n\n"
             f"Please use the correct format:\n"
-            f"`Button1 - URL1 | Button2 - URL2`",
-            parse_mode=ParseMode.MARKDOWN
+            f"<code>Button1 - URL1 | Button2 - URL2</code>",
+            parse_mode=ParseMode.HTML
         )
 
 
@@ -1412,9 +1298,9 @@ async def handle_done_editing_media(message: types.Message):
     
     media_count = len(user_data.get("media", []))
     await message.answer(
-        f" **Media editing completed!**\n\n"
+        f"<b>Media editing completed!</b>\n\n"
         f"Total media files: {media_count}",
-        parse_mode=ParseMode.MARKDOWN
+        parse_mode=ParseMode.HTML
     )
     
     # Go back to edit menu

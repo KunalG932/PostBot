@@ -3,8 +3,10 @@ Statistics and analytics handlers
 """
 from aiogram import types
 from aiogram.filters import Command
+from aiogram.enums import ParseMode
 from datetime import datetime, timedelta
 import asyncio
+import html
 
 from constants import router
 from db import db
@@ -35,32 +37,33 @@ async def cmd_stats(message: types.Message):
             today_posts = 0
         
         stats_text = (
-            f" **Bot Statistics**\n\n"
-            f" **Users**\n"
+            f"<b>Bot Statistics</b>\n\n"
+            f"<b>Users</b>\n"
             f"• Total users: {total_users:,}\n"
             f"• Connected users: {connected_users:,}\n"
             f"• New today: {today_users:,}\n"
             f"• New this week: {week_users:,}\n"
             f"• Connection rate: {(connected_users/total_users*100):.1f}%\n\n" if total_users > 0 else "• Connection rate: 0%\n\n"
-            f" **Posts**\n"
+            f"<b>Posts</b>\n"
             f"• Total posts: {total_posts:,}\n"
             f"• Posts today: {today_posts:,}\n\n"
-            f" **System**\n"
+            f"<b>System</b>\n"
             f"• Analytics: {'' if Config.ENABLE_ANALYTICS else ''}\n"
             f"• Backup: {'' if Config.ENABLE_BACKUP else ''}\n"
             f"• Notifications: {'' if Config.ENABLE_NOTIFICATIONS else ''}"
         )
         
-        await message.reply(stats_text, parse_mode="Markdown")
+        await message.reply(stats_text, parse_mode=ParseMode.HTML)
         
     except Exception as e:
-        await message.reply(f" Error fetching stats: {str(e)}")
+        error_msg = html.escape(str(e))
+        await message.reply(f"Error fetching stats: {error_msg}")
 
 @router.message(Command("analytics"))
 async def cmd_analytics(message: types.Message):
     """Show detailed analytics (admin only)"""
     if not Config.is_admin(message.from_user.id):
-        await message.reply(" This command is only available for administrators.")
+        await message.reply("This command is only available for administrators.")
         return
     
     try:
@@ -68,28 +71,29 @@ async def cmd_analytics(message: types.Message):
         analytics = await get_detailed_analytics()
         
         analytics_text = (
-            f" **Detailed Analytics**\n\n"
-            f" **Daily Growth**\n"
+            f"<b>Detailed Analytics</b>\n\n"
+            f"<b>Daily Growth</b>\n"
             f"• Today: +{analytics['daily']['today']:,} users\n"
             f"• Yesterday: +{analytics['daily']['yesterday']:,} users\n"
             f"• Average/day: {analytics['daily']['average']:.1f} users\n\n"
-            f" **Weekly Stats**\n"
+            f"<b>Weekly Stats</b>\n"
             f"• This week: +{analytics['weekly']['current']:,} users\n"
             f"• Last week: +{analytics['weekly']['previous']:,} users\n"
             f"• Growth: {analytics['weekly']['growth']:+.1f}%\n\n"
-            f" **Activity**\n"
+            f"<b>Activity</b>\n"
             f"• Active users (7d): {analytics['activity']['active_7d']:,}\n"
             f"• Posts created (7d): {analytics['activity']['posts_7d']:,}\n"
             f"• Average posts/user: {analytics['activity']['avg_posts_per_user']:.1f}\n\n"
-            f" **Top Features**\n"
+            f"<b>Top Features</b>\n"
             f"• Most used: {analytics['features']['most_used']}\n"
             f"• Least used: {analytics['features']['least_used']}"
         )
         
-        await message.reply(analytics_text, parse_mode="Markdown")
+        await message.reply(analytics_text, parse_mode=ParseMode.HTML)
         
     except Exception as e:
-        await message.reply(f" Error fetching analytics: {str(e)}")
+        error_msg = html.escape(str(e))
+        await message.reply(f"Error fetching analytics: {error_msg}")
 
 async def get_detailed_analytics():
     """Get detailed analytics data"""

@@ -1,6 +1,7 @@
 """
 Channel selection functionality for multi-channel posting
 """
+import html
 from aiogram import types
 from aiogram.enums import ParseMode
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -17,10 +18,10 @@ async def show_channel_selection(message: types.Message, action="publish"):
     
     if not connected_channels:
         await message.answer(
-            " **No Connected Channels**\n\n"
+            "<b>No Connected Channels</b>\n\n"
             "You need to connect to at least one channel first.\n"
-            "Use `/connect @channelname` to connect to a channel.",
-            parse_mode=ParseMode.MARKDOWN
+            "Use <code>/connect @channelname</code> to connect to a channel.",
+            parse_mode=ParseMode.HTML
         )
         return
     
@@ -65,19 +66,19 @@ async def show_channel_selection(message: types.Message, action="publish"):
         )
     ])
     
-    response = " **Select Channels to Post**\n\n"
+    response = "<b>Select Channels to Post</b>\n\n"
     response += "Choose one or more channels to publish your post:\n\n"
     
     for i, channel in enumerate(connected_channels, 1):
-        title = channel.get("title", channel.get("username", "Unknown"))
-        username = channel.get("username", "")
-        response += f"{i}. **{title}**\n"
+        title = html.escape(channel.get("title", channel.get("username", "Unknown")))
+        username = html.escape(channel.get("username", ""))
+        response += f"{i}. <b>{title}</b>\n"
         if username:
             response += f"    {username}\n"
     
     await message.answer(
         response,
-        parse_mode=ParseMode.MARKDOWN,
+        parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
     )
 
@@ -93,25 +94,25 @@ async def handle_single_channel_select(query: types.CallbackQuery):
     except (ValueError, IndexError):
         try:
             await query.message.edit_text(
-                " **Error**\n\nInvalid channel selection.",
-                parse_mode=ParseMode.MARKDOWN
+                "<b>Error</b>\n\nInvalid channel selection.",
+                parse_mode=ParseMode.HTML
             )
         except Exception:
             await query.message.answer(
-                " **Error**\n\nInvalid channel selection.",
-                parse_mode=ParseMode.MARKDOWN
+                "<b>Error</b>\n\nInvalid channel selection.",
+                parse_mode=ParseMode.HTML
             )
     except Exception as e:
         # Handle any other errors during publishing
         try:
             await query.message.edit_text(
-                f" **Publishing Error**\n\n{str(e)}",
-                parse_mode=ParseMode.MARKDOWN
+                f"<b>Publishing Error</b>\n\n{html.escape(str(e))}",
+                parse_mode=ParseMode.HTML
             )
         except Exception:
             await query.message.answer(
-                f" **Publishing Error**\n\n{str(e)}",
-                parse_mode=ParseMode.MARKDOWN
+                f"<b>Publishing Error</b>\n\n{html.escape(str(e))}",
+                parse_mode=ParseMode.HTML
             )
 
 
@@ -127,13 +128,13 @@ async def handle_all_channels_select(query: types.CallbackQuery):
         if not connected_channels:
             try:
                 await query.message.edit_text(
-                    " **No Connected Channels**",
-                    parse_mode=ParseMode.MARKDOWN
+                    "<b>No Connected Channels</b>",
+                    parse_mode=ParseMode.HTML
                 )
             except Exception:
                 await query.message.answer(
-                    " **No Connected Channels**",
-                    parse_mode=ParseMode.MARKDOWN
+                    "<b>No Connected Channels</b>",
+                    parse_mode=ParseMode.HTML
                 )
             return
         
@@ -145,13 +146,13 @@ async def handle_all_channels_select(query: types.CallbackQuery):
         # Handle any errors during the process
         try:
             await query.message.edit_text(
-                f" **Error**\n\n{str(e)}",
-                parse_mode=ParseMode.MARKDOWN
+                f"<b>Error</b>\n\n{html.escape(str(e))}",
+                parse_mode=ParseMode.HTML
             )
         except Exception:
             await query.message.answer(
-                f" **Error**\n\n{str(e)}",
-                parse_mode=ParseMode.MARKDOWN
+                f"<b>Error</b>\n\n{html.escape(str(e))}",
+                parse_mode=ParseMode.HTML
             )
 
 
@@ -165,8 +166,8 @@ async def handle_multi_select_start(query: types.CallbackQuery):
     
     if not connected_channels:
         await query.message.edit_text(
-            " **No Connected Channels**",
-            parse_mode=ParseMode.MARKDOWN
+            "<b>No Connected Channels</b>",
+            parse_mode=ParseMode.HTML
         )
         return
     
@@ -213,24 +214,24 @@ async def show_multi_select_interface(message: types.Message, channels, selected
     
     keyboard.append(action_row)
     
-    response = " **Multi-Channel Selection**\n\n"
+    response = "<b>Multi-Channel Selection</b>\n\n"
     response += "Select the channels you want to post to:\n\n"
     
     for i, channel in enumerate(channels):
-        title = channel.get("title", channel.get("username", "Unknown"))
-        username = channel.get("username", "")
+        title = html.escape(channel.get("title", channel.get("username", "Unknown")))
+        username = html.escape(channel.get("username", ""))
         is_selected = i in selected_indices
         emoji = "" if is_selected else ""
-        response += f"{emoji} **{title}**\n"
+        response += f"{emoji} <b>{title}</b>\n"
         if username:
             response += f"    {username}\n"
     
     if selected_indices:
-        response += f"\n**Selected:** {len(selected_indices)} channel(s)"
+        response += f"\n<b>Selected:</b> {len(selected_indices)} channel(s)"
     
     await message.edit_text(
         response,
-        parse_mode=ParseMode.MARKDOWN,
+        parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
     )
 
@@ -285,8 +286,8 @@ async def handle_cancel_selection(query: types.CallbackQuery):
     await query.answer()
     
     await query.message.edit_text(
-        " **Cancelled**\n\nChannel selection cancelled.",
-        parse_mode=ParseMode.MARKDOWN
+        "<b>Cancelled</b>\n\nChannel selection cancelled.",
+        parse_mode=ParseMode.HTML
     )
     
     # Return to post menu
@@ -320,9 +321,9 @@ async def publish_to_channels(message: types.Message, channel_indices, user_id=N
     
     if not user_data:
         await message.edit_text(
-            " **No Content to Publish**\n\n"
+            "<b>No Content to Publish</b>\n\n"
             "Please create a post first.",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=ParseMode.HTML
         )
         return
     
@@ -331,8 +332,8 @@ async def publish_to_channels(message: types.Message, channel_indices, user_id=N
     
     if not valid_indices:
         await message.edit_text(
-            " **Invalid Channel Selection**",
-            parse_mode=ParseMode.MARKDOWN
+            "<b>Invalid Channel Selection</b>",
+            parse_mode=ParseMode.HTML
         )
         return
     
@@ -340,17 +341,17 @@ async def publish_to_channels(message: types.Message, channel_indices, user_id=N
     
     # Show publishing status
     if len(selected_channels) == 1:
-        channel_name = selected_channels[0].get("title", selected_channels[0].get("username", "Unknown"))
-        status_text = f" **Publishing to: {channel_name}**\n\nYour post is being sent..."
+        channel_name = html.escape(selected_channels[0].get("title", selected_channels[0].get("username", "Unknown")))
+        status_text = f"<b>Publishing to: {channel_name}</b>\n\nYour post is being sent..."
     else:
-        status_text = f" **Publishing to {len(selected_channels)} channels**\n\nYour post is being sent..."
+        status_text = f"<b>Publishing to {len(selected_channels)} channels</b>\n\nYour post is being sent..."
     
     # Try to edit the message, if that fails, send a new message
     try:
-        await message.edit_text(status_text, parse_mode=ParseMode.MARKDOWN)
+        await message.edit_text(status_text, parse_mode=ParseMode.HTML)
     except Exception as edit_error:
         # If editing fails, send a new message
-        await message.answer(status_text, parse_mode=ParseMode.MARKDOWN)
+        await message.answer(status_text, parse_mode=ParseMode.HTML)
         # Update message reference for result display
         message = await message.answer("Processing...")
         await message.delete()
@@ -373,33 +374,36 @@ async def publish_to_channels(message: types.Message, channel_indices, user_id=N
     if success_count == len(selected_channels):
         # All successful
         if len(selected_channels) == 1:
-            result_text = " **Post Published Successfully!**\n\n"
-            result_text += f"Your post has been sent to **{selected_channels[0].get('title', 'the channel')}**"
+            channel_name = html.escape(selected_channels[0].get('title', 'the channel'))
+            result_text = "<b>Post Published Successfully!</b>\n\n"
+            result_text += f"Your post has been sent to <b>{channel_name}</b>"
         else:
-            result_text = f" **Post Published Successfully!**\n\n"
-            result_text += f"Your post has been sent to **{len(selected_channels)}** channels"
+            result_text = f"<b>Post Published Successfully!</b>\n\n"
+            result_text += f"Your post has been sent to <b>{len(selected_channels)}</b> channels"
     elif success_count > 0:
         # Partial success
-        result_text = f" **Partially Published**\n\n"
-        result_text += f"Successfully posted to **{success_count}** out of **{len(selected_channels)}** channels\n\n"
-        result_text += "**Failed channels:**\n"
+        result_text = f"<b>Partially Published</b>\n\n"
+        result_text += f"Successfully posted to <b>{success_count}</b> out of <b>{len(selected_channels)}</b> channels\n\n"
+        result_text += "<b>Failed channels:</b>\n"
         for failed in failed_channels:
-            channel_name = failed["channel"].get("title", failed["channel"].get("username", "Unknown"))
-            result_text += f"• {channel_name}: {failed['error'][:50]}...\n"
+            channel_name = html.escape(failed["channel"].get("title", failed["channel"].get("username", "Unknown")))
+            error_msg = html.escape(failed['error'][:50])
+            result_text += f"• {channel_name}: {error_msg}...\n"
     else:
         # All failed
-        result_text = " **Publishing Failed**\n\n"
+        result_text = "<b>Publishing Failed</b>\n\n"
         result_text += "Failed to publish to any channels:\n"
         for failed in failed_channels:
-            channel_name = failed["channel"].get("title", failed["channel"].get("username", "Unknown"))
-            result_text += f"• {channel_name}: {failed['error'][:50]}...\n"
+            channel_name = html.escape(failed["channel"].get("title", failed["channel"].get("username", "Unknown")))
+            error_msg = html.escape(failed['error'][:50])
+            result_text += f"• {channel_name}: {error_msg}...\n"
     
     # Show results with better error handling
     try:
-        await message.edit_text(result_text, parse_mode=ParseMode.MARKDOWN)
+        await message.edit_text(result_text, parse_mode=ParseMode.HTML)
     except Exception as edit_error:
         # If editing fails, send a new message
-        await message.answer(result_text, parse_mode=ParseMode.MARKDOWN)
+        await message.answer(result_text, parse_mode=ParseMode.HTML)
     if success_count > 0:
         # Clear post data after successful publish
         from utils.data_store import clear_user_data

@@ -2,6 +2,7 @@
 Button management handlers
 """
 import re
+import html
 from aiogram import types
 from aiogram.enums import ParseMode
 
@@ -23,10 +24,10 @@ async def cmd_add_new_button(message: types.Message):
     keyboard = get_back_to_post_menu_keyboard()
     
     await message.answer(
-        f"**Add New Button**\n\n"
+        f"<b>Add New Button</b>\n\n"
         f"Send me the text for the button:",
         reply_markup=keyboard,
-        parse_mode=ParseMode.MARKDOWN
+        parse_mode=ParseMode.HTML
     )
 
 @router.message(lambda message: message.text == "Send Message Format")
@@ -43,16 +44,16 @@ async def cmd_send_message_format(message: types.Message):
     keyboard = get_back_to_post_menu_keyboard()
     
     await message.answer(
-        f"**Send Multiple Buttons Format**\n\n"
+        f"<b>Send Multiple Buttons Format</b>\n\n"
         f"Send buttons in this format:\n"
-        f"`Button1 - https://url1.com | Button2 - https://url2.com`\n\n"
-        f"**Examples:**\n"
-        f"• `Visit Website - https://example.com`\n"
-        f"• `Download App - https://app.com | Join Channel - https://t.me/channel`\n"
-        f"• `Button1 - url1 | Button2 - url2 | Button3 - url3`\n\n"
-        f"Use ` | ` to separate multiple buttons.",
+        f"<code>Button1 - https://url1.com | Button2 - https://url2.com</code>\n\n"
+        f"<b>Examples:</b>\n"
+        f"• <code>Visit Website - https://example.com</code>\n"
+        f"• <code>Download App - https://app.com | Join Channel - https://t.me/channel</code>\n"
+        f"• <code>Button1 - url1 | Button2 - url2 | Button3 - url3</code>\n\n"
+        f"Use <code> | </code> to separate multiple buttons.",
         reply_markup=keyboard,
-        parse_mode=ParseMode.MARKDOWN
+        parse_mode=ParseMode.HTML
     )
 
 @router.message(lambda message: message.text == "Clear Buttons")
@@ -80,11 +81,12 @@ async def process_button_text_input(message: types.Message):
     
     keyboard = get_back_to_post_menu_keyboard()
     
+    safe_text = html.escape(message.text)
     await message.answer(
-        f"**Button Text Set:** {message.text}\n\n"
+        f"<b>Button Text Set:</b> {safe_text}\n\n"
         f"Now send me the URL for this button:",
         reply_markup=keyboard,
-        parse_mode=ParseMode.MARKDOWN
+        parse_mode=ParseMode.HTML
     )
 
 # Handler for processing button URL input
@@ -112,9 +114,9 @@ async def process_button_url_input(message: types.Message):
     
     if not url_pattern.match(url):
         await message.answer(
-            "**Invalid URL**\n\n"
+            "<b>Invalid URL</b>\n\n"
             "Please send a valid URL (e.g., https://example.com)",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=ParseMode.HTML
         )
         return
     
@@ -130,13 +132,14 @@ async def process_button_url_input(message: types.Message):
     set_user_data(message.from_user.id, user_data)
     
     button_count = len(user_data["buttons"])
+    safe_text = html.escape(button_text)
     
     await message.answer(
-        f"**Button Added!**\n\n"
-        f"Button: {button_text}\n"
+        f"<b>Button Added!</b>\n\n"
+        f"Button: {safe_text}\n"
         f"URL: {url}\n\n"
         f"Total buttons: {button_count}",
-        parse_mode=ParseMode.MARKDOWN
+        parse_mode=ParseMode.HTML
     )
     
     from .post_menu import show_post_menu
@@ -183,19 +186,21 @@ async def process_multiple_buttons_input(message: types.Message):
                         "url": url
                     })
                 else:
+                    safe_text = html.escape(button_text)
                     await message.answer(
-                        f"**Invalid URL format for button:** {button_text}\n"
+                        f"<b>Invalid URL format for button:</b> {safe_text}\n"
                         f"URL: {url}\n\n"
                         f"Please check the format and try again.",
-                        parse_mode=ParseMode.MARKDOWN
+                        parse_mode=ParseMode.HTML
                     )
                     return
             else:
+                safe_pair = html.escape(pair)
                 await message.answer(
-                    f"**Invalid format for:** {pair}\n\n"
+                    f"<b>Invalid format for:</b> {safe_pair}\n\n"
                     f"Use format: Button Text - URL\n"
                     f"Example: Visit Site - https://example.com",
-                    parse_mode=ParseMode.MARKDOWN
+                    parse_mode=ParseMode.HTML
                 )
                 return
         
@@ -205,30 +210,30 @@ async def process_multiple_buttons_input(message: types.Message):
             user_data["state"] = "main_post_menu"
             set_user_data(message.from_user.id, user_data)
             
-            buttons_summary = "\n".join([f"• {btn['text']} → {btn['url']}" for btn in parsed_buttons])
+            buttons_summary = "\n".join([f"• {html.escape(btn['text'])} → {btn['url']}" for btn in parsed_buttons])
             total_buttons = len(user_data["buttons"])
             
             await message.answer(
-                f"**{len(parsed_buttons)} Button(s) Added!**\n\n"
+                f"<b>{len(parsed_buttons)} Button(s) Added!</b>\n\n"
                 f"Added buttons:\n{buttons_summary}\n\n"
                 f"Total buttons: {total_buttons}",
-                parse_mode=ParseMode.MARKDOWN
+                parse_mode=ParseMode.HTML
             )
             
             from .post_menu import show_post_menu
             await show_post_menu(message)
         else:
             await message.answer(
-                "**No valid buttons found**\n\n"
+                "<b>No valid buttons found</b>\n\n"
                 "Please check the format and try again.",
-                parse_mode=ParseMode.MARKDOWN
+                parse_mode=ParseMode.HTML
             )
     
     except Exception as e:
         await message.answer(
-            f"**Error parsing buttons**\n\n"
+            f"<b>Error parsing buttons</b>\n\n"
             f"Error: {str(e)}\n\n"
             f"Please use the correct format:\n"
-            f"`Button1 - URL1 | Button2 - URL2`",
-            parse_mode=ParseMode.MARKDOWN
+            f"<code>Button1 - URL1 | Button2 - URL2</code>",
+            parse_mode=ParseMode.HTML
         )
