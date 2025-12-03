@@ -1,6 +1,7 @@
 """
 Post menu display and management
 """
+import html
 from aiogram import types
 from aiogram.enums import ParseMode
 
@@ -19,9 +20,14 @@ async def show_post_menu(message):
     # Text status
     text_content = user_data.get("text", "")
     if text_content:
-        text_preview = text_content[:50] + "..." if len(text_content) > 50 else text_content
+        # Truncate first, then escape for safe display
+        truncated_text = text_content[:50]
+        safe_text = html.escape(truncated_text)
+        if len(text_content) > 50:
+            safe_text += "..."
+            
         status_lines.append(f"Text: YES ({len(text_content)} chars)")
-        status_lines.append(f"   Preview: \"{text_preview}\"")
+        status_lines.append(f"   Preview: \"{safe_text}\"")
     else:
         status_lines.append("Text: NO (No text added)")
         
@@ -44,7 +50,9 @@ async def show_post_menu(message):
     if buttons_list:
         status_lines.append(f"Buttons: YES ({len(buttons_list)} buttons)")
         for i, btn in enumerate(buttons_list[:3], 1):  # Show first 3 buttons
-            status_lines.append(f"   {i}. {btn['text']}")
+            # Escape button text
+            safe_btn_text = html.escape(btn['text'])
+            status_lines.append(f"   {i}. {safe_btn_text}")
         if len(buttons_list) > 3:
             status_lines.append(f"   ... and {len(buttons_list) - 3} more")
     else:
@@ -69,10 +77,10 @@ async def show_post_menu(message):
     status_text = "\n".join(status_lines)
     
     await message.answer(
-        f"**Create Your Post**\n\n"
-        f"**Status:**\n{status_text}\n\n"
-        f"**{readiness_status}**\n\n"
+        f"<b>Create Your Post</b>\n\n"
+        f"<b>Status:</b>\n{status_text}\n\n"
+        f"<b>{readiness_status}</b>\n\n"
         f"Choose an option:",
         reply_markup=keyboard,
-        parse_mode=ParseMode.MARKDOWN
+        parse_mode=ParseMode.HTML
     )
