@@ -1,0 +1,120 @@
+# Koyeb Deployment Configuration
+# Complete environment variable setup for PostBot
+
+app:
+  name: postbot
+  
+services:
+  - name: postbot-worker
+    type: worker
+    instance_type: nano  # Free tier (or use "small" for paid)
+    
+    build:
+      buildpack: heroku/python
+    
+    # All Environment Variables
+    env:
+      # REQUIRED: Telegram Bot Configuration
+      - name: BOT_TOKEN
+        value: ${BOT_TOKEN}
+        # Get this from @BotFather on Telegram
+      
+      # REQUIRED: Database Configuration
+      - name: MONGO_URI
+        value: ${MONGO_URI}
+        # MongoDB connection string (e.g., mongodb+srv://user:pass@cluster.mongodb.net/postbot)
+      
+      - name: DATABASE_NAME
+        value: postbot
+      
+      # Optional: Default Channel
+      - name: CHANNEL_ID
+        value: "0"
+        # Default channel ID (0 = none)
+      
+      # Admin Configuration
+      - name: ADMIN_IDS
+        value: ${ADMIN_IDS}
+        # Comma-separated admin user IDs (e.g., "123456789,987654321")
+      
+      # Bot Limits
+      - name: MAX_CHANNELS_PER_USER
+        value: "50"
+        # Maximum channels per user (increased from 10)
+      
+      - name: MAX_BUTTONS_PER_POST
+        value: "10"
+        # Maximum buttons per post
+      
+      - name: MAX_MEDIA_PER_POST
+        value: "10"
+        # Maximum media files per post
+      
+      # Cache Settings
+      - name: CACHE_TTL
+        value: "3600"
+        # Cache time-to-live in seconds (1 hour)
+      
+      # Logging Configuration
+      - name: LOG_LEVEL
+        value: INFO
+        # Logging level: DEBUG, INFO, WARNING, ERROR
+      
+      - name: LOG_FILE
+        value: postbot.log
+        # Log file name
+      
+      # Feature Flags
+      - name: ENABLE_ANALYTICS
+        value: "true"
+        # Enable bot analytics tracking
+      
+      - name: ENABLE_BACKUP
+        value: "true"
+        # Enable automated backups
+      
+      - name: ENABLE_NOTIFICATIONS
+        value: "true"
+        # Enable bot notifications
+      
+      # Rate Limiting
+      - name: RATE_LIMIT_REQUESTS
+        value: "30"
+        # Max requests per window
+      
+      - name: RATE_LIMIT_WINDOW
+        value: "60"
+        # Rate limit window in seconds
+      
+      # Backup Settings
+      - name: BACKUP_INTERVAL
+        value: "86400"
+        # Backup interval in seconds (24 hours)
+      
+      - name: BACKUP_RETENTION
+        value: "7"
+        # Backup retention in days
+    
+    # Health check (optional)
+    health_checks:
+      - type: tcp
+        port: 8000
+        interval: 30s
+        timeout: 10s
+        grace_period: 60s
+    
+    # Auto-scaling
+    scaling:
+      min: 1
+      max: 1
+    
+    # Port exposure (if webhook mode is needed)
+    ports:
+      - port: 8000
+        protocol: http
+
+# Notes:
+# - Replace ${BOT_TOKEN}, ${MONGO_URI}, and ${ADMIN_IDS} with actual values in Koyeb dashboard
+# - All other values can use defaults or customize as needed
+# - Free tier (nano) is sufficient for most small-medium bots
+# - Upgrade to "small" instance for higher traffic
